@@ -1,0 +1,10 @@
+# Gerados no uso (caminhos e historico de quem usa)
+config.json
+xiso-manager.log
+xiso-manager.log.old
+tmp/
+__pycache__/
+
+# Binarios de terceiros: baixe do projeto original (ver README)
+extract-xiso
+iso2god*
