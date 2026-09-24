@@ -249,8 +249,8 @@ Python 3.8+, `extract-xiso` e `iso2god`. Nenhuma biblioteca externa.
   originalmente por *in* (in@fishtank.com) e mantido hoje pela comunidade
   XboxDev. É ele quem extrai, lista, cria e reescreve os ISOs; o xiso-manager
   só dá a interface.
-- **[iso2god-rs](https://github.com/iliazeus/iso2god-rs)** — de Ilia Pozdnyakov
-  (iliazeus), também suportado pelo xiso-manager.
+- **[iso2god-rs](https://github.com/iliazeus/iso2god-rs)** — de iliazeus, também
+  suportado pelo xiso-manager.
 - **iso2god em Rust (português)** — de lux-insider, o mesmo autor do
   xiso-manager.
 
