@@ -14,12 +14,17 @@ git clone https://github.com/lux-insider/xiso-manager.git ~/Ferramentas/xiso-man
 chmod +x ~/Ferramentas/xiso-manager/xiso_manager.py
 ```
 
-Ele usa duas ferramentas externas, que não vêm junto:
+Ele usa duas ferramentas externas. As duas, para Linux x86_64 (glibc 2.34+),
+estão prontas na página de
+[Releases](https://github.com/lux-insider/xiso-manager/releases):
 
-- **extract-xiso** (Xbox clássico) — https://github.com/XboxDev/extract-xiso
+- **extract-xiso** (Xbox clássico) — build oficial do
+  [XboxDev/extract-xiso](https://github.com/XboxDev/extract-xiso), v2.7.1,
+  sem modificação. A licença dele vai junto: `extract-xiso-LICENSE.TXT`.
 - **iso2god** (Xbox 360) — veja [Qual iso2god](#qual-iso2god)
 
-Coloque os binários na pasta da ferramenta ou em qualquer lugar do `PATH`.
+Baixe, dê `chmod +x extract-xiso iso2god` e deixe na pasta da ferramenta (ou em
+qualquer lugar do `PATH`).
 
 Para chamar de qualquer lugar, adicione ao `~/.bashrc`:
 
@@ -247,7 +252,11 @@ Python 3.8+, `extract-xiso` e `iso2god`. Nenhuma biblioteca externa.
 - **[extract-xiso](https://github.com/XboxDev/extract-xiso)** — escrito
   originalmente por *in* (in@fishtank.com) e mantido hoje pela comunidade
   XboxDev. É ele quem extrai, lista, cria e reescreve os ISOs; o xiso-manager
-  só dá a interface.
+  só dá a interface. O binário da release é o build oficial deles, sem
+  modificação, redistribuído sob a licença BSD modificada do projeto
+  (`extract-xiso-LICENSE.TXT`), Copyright (c) 2003 in <in@fishtank.com>.
+
+  *This product includes software developed by in <in@fishtank.com>.*
 - **iso2god em Rust (português)** — de lux-insider, o mesmo autor do
   xiso-manager.
 
@@ -255,4 +264,5 @@ Python 3.8+, `extract-xiso` e `iso2god`. Nenhuma biblioteca externa.
 
 ## Licença
 
-MIT — veja [LICENSE](LICENSE).
+MIT — veja [LICENSE](LICENSE). Vale para o código do xiso-manager; o
+extract-xiso segue a licença própria dele (`extract-xiso-LICENSE.TXT`).
