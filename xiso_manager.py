@@ -740,6 +740,8 @@ TEXTOS = {
         # analise
         "analisando": "Analisando",
         "tipo_detectado": "Tipo detectado",
+        "iso2god_incompativel": "Este iso2god não é compatível: o xiso-manager precisa do iso2god em Rust (subcomandos converter/info).",
+        "iso2god_onde_baixar": "Baixe em https://github.com/lux-insider/xiso-manager/releases e informe o caminho em Configurações.",
         "i_plataforma": "Plataforma",
         "i_titulo": "Título",
         "i_disco": "Disco",
@@ -947,6 +949,8 @@ TEXTOS = {
 
         "analisando": "Analyzing",
         "tipo_detectado": "Detected type",
+        "iso2god_incompativel": "This iso2god is not compatible: xiso-manager needs the Rust iso2god (converter/info subcommands).",
+        "iso2god_onde_baixar": "Download it from https://github.com/lux-insider/xiso-manager/releases and set its path in Settings.",
         "i_plataforma": "Platform",
         "i_titulo": "Title",
         "i_disco": "Disc",
@@ -1314,7 +1318,7 @@ PASTAS_COMUNS = [
 ]
 
 NOMES_EXTRACT = ["extract-xiso", "extract_xiso", "extract-xiso-linux"]
-NOMES_ISO2GOD = ["iso2god", "iso2god-linux-x86_64", "iso2god-x86_64-linux", "iso2god-linux", "iso2god-x86_64"]
+NOMES_ISO2GOD = ["iso2god", "iso2god-linux-x86_64"]
 NOMES_XGDTOOL = ["XGDTool", "xgdtool", "XGDTool-cli", "xgdtool-cli"]
 
 
@@ -1431,9 +1435,9 @@ _ISO2GOD_PROPRIO = {}
 
 
 def iso2god_proprio(binario=None):
-    """O iso2god em uso é o reescrito em Rust (lux-insider/iso2god), com os
-    subcomandos `converter`/`info` e o protocolo `--progresso-json`? Os
-    outros (iso2god-rs e afins) recebem ISO e destino direto, com `--trim`.
+    """O iso2god configurado é o compatível (em Rust, em português), com os
+    subcomandos `converter`/`info` e o protocolo `--progresso-json`? Outros
+    programas com o mesmo nome têm outra linha de comando e não servem.
     A resposta é guardada por binário: o `--help` só roda uma vez."""
     binario = binario or bin_god()
     if binario not in _ISO2GOD_PROPRIO:
@@ -1448,6 +1452,17 @@ def iso2god_proprio(binario=None):
 
 def bin_xgd():
     return cfg("bin_xgdtool", "")
+
+
+def exigir_iso2god():
+    """O iso2god configurado existe e é o compatível? Senão, explica o porquê."""
+    if not exigir_binario(bin_god(), "iso2god"):
+        return False
+    if iso2god_proprio():
+        return True
+    erro(t("iso2god_incompativel"))
+    dica(t("iso2god_onde_baixar"))
+    return False
 
 
 def exigir_binario(caminho, nome):
@@ -2466,7 +2481,7 @@ def acao_reescrever(arquivos=None):
 
 def acao_god(arquivos=None):
     tela(t("m_god"), EMO["god"], t("d_god"), C.AZUL)
-    if not exigir_binario(bin_god(), "iso2god"):
+    if not exigir_iso2god():
         pausar()
         return
 
@@ -2516,18 +2531,12 @@ def acao_god(arquivos=None):
                         cortar(os.path.basename(arquivo), 40),
                         EMO["jogo"], largura_rotulo=8))
 
-        if iso2god_proprio():
-            # "cortar o fim" do iso2god-rs equivale ao padding "parcial"
-            args = [bin_god(), "converter", "--progresso-json",
-                    "-j", str(threads),
-                    "--padding", "parcial" if cortar_fim else "nenhuma"]
-            if titulo_jogo:
-                args += ["--titulo", titulo_jogo]
-        else:
-            args = [bin_god(), "-j", str(threads)]
-            if titulo_jogo:
-                args += ["--game-title", titulo_jogo]
-            args.append("--trim=from-end" if cortar_fim else "--trim=none")
+        # "cortar o espaço não usado do fim" é o padding "parcial"
+        args = [bin_god(), "converter", "--progresso-json",
+                "-j", str(threads),
+                "--padding", "parcial" if cortar_fim else "nenhuma"]
+        if titulo_jogo:
+            args += ["--titulo", titulo_jogo]
         args += [arquivo, destino]
 
         try:
@@ -2549,15 +2558,6 @@ def acao_god(arquivos=None):
     mostrar_resumo(t("m_god"), ok, falhas, time.time() - inicio,
                    produzidos=gerados)
     pausar()
-
-
-def pasta_temp():
-    alvo = DIR_BASE / "tmp"
-    try:
-        alvo.mkdir(parents=True, exist_ok=True)
-        return str(alvo)
-    except Exception:
-        return "/tmp"
 
 
 def mostrar_info_iso2god(arquivo):
@@ -2610,7 +2610,7 @@ def mostrar_info_iso2god(arquivo):
 
 def acao_info_god(arquivos=None):
     tela(t("m_info_god"), EMO["analisar"], t("d_info_god"), C.CIANO)
-    if not exigir_binario(bin_god(), "iso2god"):
+    if not exigir_iso2god():
         pausar()
         return
 
@@ -2634,17 +2634,9 @@ def acao_info_god(arquivos=None):
                     cor(rotulo_tipo(tipo), cor_tipo(tipo))
                     + (cor("  (%s)" % layout, C.CINZA) if layout else ""),
                     EMO["analisar"], largura_rotulo=16))
-        if iso2god_proprio():
-            deu_certo = mostrar_info_iso2god(arquivo)
-            ok += 1 if deu_certo else 0
-            falhas += 0 if deu_certo else 1
-            continue
-        r = executar([bin_god(), "--dry-run", arquivo, pasta_temp()],
-                     t("analisando"), EMO["analisar"], max_linhas=25)
-        ok += 1 if r.ok else 0
-        falhas += 0 if r.ok else 1
-        if r.cancelado:
-            break
+        deu_certo = mostrar_info_iso2god(arquivo)
+        ok += 1 if deu_certo else 0
+        falhas += 0 if deu_certo else 1
 
     mostrar_resumo(t("m_info_god"), ok, falhas, time.time() - inicio)
     pausar()
@@ -2807,12 +2799,12 @@ def acao_manual():
         exemplo = "-x -s -d ~/Extraidos jogo.iso"
     elif qual == "2":
         binario, nome = bin_god(), "iso2god"
-        exemplo = ("converter -j 4 --padding parcial jogo.iso ~/GOD"
-                   if iso2god_proprio() else "-j 4 --trim=from-end jogo.iso ~/GOD")
+        exemplo = "converter -j 4 --padding parcial jogo.iso ~/GOD"
     else:
         return
 
-    if not exigir_binario(binario, nome):
+    ok_bin = exigir_iso2god() if nome == "iso2god" else exigir_binario(binario, nome)
+    if not ok_bin:
         pausar()
         return
 

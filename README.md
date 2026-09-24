@@ -33,16 +33,15 @@ Depois `source ~/.bashrc` uma vez. Daí em diante é só `xiso`.
 
 ### Qual iso2god
 
-Funciona com dois iso2god diferentes e descobre sozinho qual está configurado:
+Usa o **iso2god em Rust com interface em português** (subcomandos `converter` e
+`info`). O xiso-manager chama `converter --progresso-json` (a barra lê o
+progresso real, em JSON) e `info --json` na análise. O binário para Linux está
+na página de [Releases](https://github.com/lux-insider/xiso-manager/releases)
+(`iso2god`, x86_64, glibc 2.34+): baixe, dê `chmod +x` e deixe na pasta da
+ferramenta.
 
-- **iso2god em Rust com interface em português** (subcomandos `converter` e
-  `info`) — o que o autor usa. O xiso-manager chama `converter --progresso-json`
-  (a barra lê o progresso real, em JSON) e `info --json` na análise.
-  O binário para Linux está na página de
-  [Releases](https://github.com/lux-insider/xiso-manager/releases) (`iso2god`,
-  x86_64, glibc 2.34+): baixe, dê `chmod +x` e deixe na pasta da ferramenta.
-- **[iso2god-rs](https://github.com/iliazeus/iso2god-rs)** — recebe ISO e destino
-  direto, com `--trim`; a análise usa `--dry-run`.
+Outros programas chamados iso2god têm outra linha de comando e não funcionam:
+se um deles estiver configurado, o xiso-manager avisa e diz onde baixar o certo.
 
 ### Detecção automática dos binários
 
@@ -100,7 +99,7 @@ pasta de destino.
 
 | Opção | Ferramenta | O que faz |
 |---|---|---|
-| **1 GOD** | iso2god | Converte ISO de Xbox 360 para Games on Demand. Threads e trim (padding) configuráveis. |
+| **1 GOD** | iso2god | Converte ISO de Xbox 360 para Games on Demand. Threads e padding configuráveis. |
 | **2 Analisar** | iso2god | Mostra plataforma, Title ID, Media ID e título, sem converter. |
 | **3 Extrair** | extract-xiso | Extrai todo o conteúdo do ISO para uma pasta. |
 | **4 Listar** | extract-xiso | Mostra os arquivos de dentro do ISO sem extrair nada. |
