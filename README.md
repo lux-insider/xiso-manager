@@ -38,6 +38,9 @@ Funciona com dois iso2god diferentes e descobre sozinho qual está configurado:
 - **iso2god em Rust com interface em português** (subcomandos `converter` e
   `info`) — o que o autor usa. O xiso-manager chama `converter --progresso-json`
   (a barra lê o progresso real, em JSON) e `info --json` na análise.
+  O binário para Linux está na página de
+  [Releases](https://github.com/lux-insider/xiso-manager/releases) (`iso2god`,
+  x86_64, glibc 2.34+): baixe, dê `chmod +x` e deixe na pasta da ferramenta.
 - **[iso2god-rs](https://github.com/iliazeus/iso2god-rs)** — recebe ISO e destino
   direto, com `--trim`; a análise usa `--dry-run`.
 
@@ -237,6 +240,19 @@ O programa respeita `NO_COLOR` e desliga sozinho quando a saída não é um term
 ## Requisitos
 
 Python 3.8+, `extract-xiso` e `iso2god`. Nenhuma biblioteca externa.
+
+---
+
+## Créditos
+
+- **[extract-xiso](https://github.com/XboxDev/extract-xiso)** — escrito
+  originalmente por *in* (in@fishtank.com) e mantido hoje pela comunidade
+  XboxDev. É ele quem extrai, lista, cria e reescreve os ISOs; o xiso-manager
+  só dá a interface.
+- **[iso2god-rs](https://github.com/iliazeus/iso2god-rs)** — de Ilia Pozdnyakov
+  (iliazeus), também suportado pelo xiso-manager.
+- **iso2god em Rust (português)** — de lux-insider, o mesmo autor do
+  xiso-manager.
 
 ---
 

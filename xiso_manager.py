@@ -1314,7 +1314,7 @@ PASTAS_COMUNS = [
 ]
 
 NOMES_EXTRACT = ["extract-xiso", "extract_xiso", "extract-xiso-linux"]
-NOMES_ISO2GOD = ["iso2god", "iso2god-x86_64-linux", "iso2god-linux", "iso2god-x86_64"]
+NOMES_ISO2GOD = ["iso2god", "iso2god-linux-x86_64", "iso2god-x86_64-linux", "iso2god-linux", "iso2god-x86_64"]
 NOMES_XGDTOOL = ["XGDTool", "xgdtool", "XGDTool-cli", "xgdtool-cli"]
 
 
