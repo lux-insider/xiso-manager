@@ -8,3 +8,4 @@ __pycache__/
 # Binarios de terceiros: baixe do projeto original (ver README)
 extract-xiso
 iso2god*
+/windows/lancador/target/

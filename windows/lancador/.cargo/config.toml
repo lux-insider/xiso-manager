@@ -1,0 +1,3 @@
+# CRT estático: o .exe roda sem o Visual C++ Redistributable.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

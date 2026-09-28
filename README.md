@@ -36,6 +36,34 @@ Depois `source ~/.bashrc` uma vez. Daí em diante é só `xiso`.
 
 > É script Python, não função de shell — use `alias`, não `source`.
 
+### Windows
+
+Baixe o `xiso-manager-3.1-windows-x64.zip` da página de
+[Releases](https://github.com/lux-insider/xiso-manager/releases), descompacte a
+pasta inteira e dê dois cliques em **`xiso-manager.exe`**. Roda no Windows 10/11
+(64 bits) sem instalar nada: a pasta já traz tudo.
+
+```
+xiso-manager.exe          lançador (abre o programa)
+xiso_manager.py           o programa
+python\                   Python portátil oficial (python.org, "embeddable")
+extract-xiso.exe          build oficial do XboxDev para Windows, sem modificação
+iso2god.exe               iso2god em Rust, em português
+```
+
+No Windows Terminal aparece com cores e emoji. O `Ctrl+C` funciona igual ao
+Linux: espera o iso2god apagar a conversão incompleta antes de sair.
+
+O lançador é um programa pequeno em Rust (`windows/lancador/`); para gerar o
+`.exe` a partir do Linux:
+
+```bash
+sudo apt install clang lld llvm
+rustup target add x86_64-pc-windows-msvc
+cargo install --locked cargo-xwin
+cd windows/lancador && cargo xwin build --release --target x86_64-pc-windows-msvc
+```
+
 ### Qual iso2god
 
 Usa o **iso2god em Rust com interface em português** (subcomandos `converter` e
