@@ -12,32 +12,61 @@
 # ═════════════════════════════════════════════════════════════════════════
 
 # ── Códigos de retorno ───────────────────────────────────────────────────
-#   0 sucesso | 1 erro geral | 2 ferramenta ausente | 3 espaço insuficiente
-#   4 arquivo inválido | 130 Ctrl+C
+#   0 sucesso | 1 erro fatal | 130 Ctrl+C
 
 import os
 import re
 import sys
 import json
 import time
-import glob
 import shutil
 import logging
 import unicodedata
 import subprocess
 import collections
+import struct
 import threading
 from pathlib import Path
 
+WINDOWS = os.name == "nt"
+
+
+def _preparar_console_windows():
+    """No Windows: UTF-8 na saída e sequências ANSI ligadas no console.
+
+    Sem o UTF-8, o primeiro emoji impresso derruba o programa com
+    UnicodeEncodeError (o console usa uma página de código antiga). Sem o
+    modo de terminal virtual, as cores saem como lixo tipo "←[38;2;..m".
+    Devolve True se o console aceitou as cores.
+    """
+    for fluxo in (sys.stdout, sys.stderr):
+        try:
+            fluxo.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    try:
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        k32.SetConsoleOutputCP(65001)
+        k32.SetConsoleCP(65001)
+        handle = k32.GetStdHandle(-11)          # STD_OUTPUT_HANDLE
+        modo = ctypes.c_uint32()
+        if not k32.GetConsoleMode(handle, ctypes.byref(modo)):
+            return False
+        # ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        return bool(k32.SetConsoleMode(handle, modo.value | 0x0001 | 0x0004))
+    except Exception:
+        return False
+
+
+_ANSI_WINDOWS = _preparar_console_windows() if WINDOWS else False
+
 EXIT_OK = 0
 EXIT_ERRO = 1
-EXIT_FERRAMENTA = 2
-EXIT_ESPACO = 3
-EXIT_ARQUIVO = 4
 EXIT_INTERROMPIDO = 130
 
 APP_NOME = "xiso-manager"
-APP_VERSAO = "3.0"
+APP_VERSAO = "3.1"
 
 
 def _pasta_base():
@@ -67,7 +96,6 @@ def _pasta_base():
 DIR_BASE = _pasta_base()
 ARQ_CONFIG = DIR_BASE / "config.json"
 ARQ_LOG = DIR_BASE / "xiso-manager.log"
-DIR_CONFIG = DIR_BASE          # compatibilidade interna
 LIMITE_LOG = 1024 * 1024       # 1 MiB antes de rotacionar
 
 LARGURA = 66            # mesma largura das caixas do baixar-video
@@ -77,7 +105,6 @@ CONFIG_PADRAO = {
     "idioma": "pt",
     "bin_extract_xiso": "",
     "bin_iso2god": "",
-    "bin_xgdtool": "",
     "pasta_padrao": str(Path.home()),
     "threads_god": 4,
     "cor": True,
@@ -122,6 +149,10 @@ def carregar_config():
                 for chave in CONFIG_PADRAO:
                     if chave in dados:
                         _config[chave] = _validar_config(chave, dados[chave])
+                # chave que não existe mais (ex.: bin_xgdtool das versões
+                # antigas): regrava o arquivo sem ela
+                if set(dados) - set(CONFIG_PADRAO):
+                    salvar_config()
     except Exception:
         pass
     return _config
@@ -210,6 +241,9 @@ def _suporta_cor():
         return False
     if not sys.stdout.isatty():
         return False
+    if WINDOWS:
+        # o Windows não define TERM; vale o que o console aceitou
+        return _ANSI_WINDOWS
     if os.environ.get("TERM", "") in ("dumb", ""):
         return False
     return True
@@ -526,9 +560,6 @@ def opcao(chave, texto, emoji="", cor_chave=None, descricao="", cor_texto=None):
     return linha
 
 
-COL_ROTULO = 2 + 2      # dois espaços + marca de uma coluna + espaço
-
-
 def _marca_larga(simbolo):
     """
     Normaliza a marca para SEMPRE ocupar 2 colunas.
@@ -600,10 +631,6 @@ def sucesso(texto):
     log_evento("info", texto)
 
 
-def info_linha(emoji, texto, cor_texto=None):
-    print(f"{emoji}  {cor(texto, cor_texto or C.BRANC)}")
-
-
 def dica(texto):
     print(f"{EMO['dica']}  {cor(texto, C.CIANO, C.ITAL)}")
 
@@ -623,12 +650,6 @@ def pausar():
 # ═════════════════════════════════════════════════════════════════════════
 # FORMATAÇÃO
 # ═════════════════════════════════════════════════════════════════════════
-
-def nd(valor, sufixo=""):
-    """Devolve 'N/D' quando o dado não existe. Nunca inventa valores."""
-    if valor is None or valor == "" or valor == 0:
-        return "N/D"
-    return f"{valor}{sufixo}"
 
 
 def fmt_bytes(b):
@@ -664,8 +685,6 @@ def fmt_velocidade(bps):
 
 TEXTOS = {
     "pt": {
-        "subtitulo": "Gerenciador de imagens Xbox e Xbox 360",
-        "menu_titulo": "MENU PRINCIPAL",
         "escolha": "Escolha uma opção",
         "opcao_invalida": "Opção inválida. Tente novamente.",
         "enter_continuar": "Pressione ENTER para continuar",
@@ -678,7 +697,6 @@ TEXTOS = {
         "ate_logo": "Até logo! Valeu por usar o XISO Manager.",
         "obrigatorio": "Esse campo é obrigatório.",
         "pasta_nao_existe": "A pasta não existe:",
-        "arquivo_nao_existe": "O arquivo não existe:",
         "sem_permissao_leitura": "Sem permissão de leitura em:",
         "sem_permissao_escrita": "Destino sem permissão de escrita:",
 
@@ -693,6 +711,8 @@ TEXTOS = {
         "e_execucao": "Execução",
         "e_selecao": "Seleção",
         "arquivos": "arquivos",
+        "r_original_restaurado": "A reescrita falhou; o ISO original voltou ao nome de antes.",
+        "r_original_em": "O ISO original ficou em",
         "nada_a_fazer": "nada a fazer — já estava otimizado",
         "r_inertes": "Já otimizados",
         "sem_saida": "concluiu sem gerar arquivo novo",
@@ -720,8 +740,6 @@ TEXTOS = {
         # status
         "pronto": "pronto",
         "indisponivel": "não encontrado",
-        "ferramentas": "FERRAMENTAS",
-        "idioma_atual": "Idioma",
 
         # navegador
         "nav_titulo": "SELECIONAR ARQUIVO",
@@ -730,15 +748,12 @@ TEXTOS = {
         "nav_digitar": "Digitar um caminho",
         "nav_todos": "Selecionar TODOS os ISOs desta pasta",
         "nav_nenhum_iso": "Nenhum arquivo .iso encontrado nesta pasta.",
-        "nav_ajuda": "Número = abrir/selecionar   |   .. = subir   |   c = caminho   |   0 = voltar",
         "nav_caminho": "Digite o caminho completo",
         "nav_multi": "Números separados por vírgula (ex: 1,3,5) ou intervalo (1-4)",
         "nav_invalido": "Entrada ignorada:",
         "nav_nada": "Nada foi selecionado.",
-        "nav_selecionados": "selecionado(s)",
 
         # analise
-        "analisando": "Analisando",
         "tipo_detectado": "Tipo detectado",
         "iso2god_incompativel": "Este iso2god não é compatível: o xiso-manager precisa do iso2god em Rust (subcomandos converter/info).",
         "iso2god_onde_baixar": "Baixe em https://github.com/lux-insider/xiso-manager/releases e informe o caminho em Configurações.",
@@ -751,14 +766,12 @@ TEXTOS = {
         "t_xbox": "Xbox clássico (XISO)",
         "t_xbox360": "Xbox 360 (XGD)",
         "t_desconhecido": "Não reconhecido como imagem Xbox",
-        "sugestao": "SUGESTÃO",
         "sug_xbox": "Este ISO é do Xbox clássico. Use extrair, listar ou reescrever.",
         "sug_360": "Este ISO é do Xbox 360. Use a conversão para GOD.",
         "sug_nada": "Não consegui identificar. Você ainda pode tentar as opções manualmente.",
         "acoes_sugeridas": "Ações disponíveis para este arquivo",
 
         # disco
-        "disco_titulo": "ESPAÇO EM DISCO",
         "disco_destino": "Destino",
         "disco_necessario": "Necessário",
         "disco_disponivel": "Disponível",
@@ -772,7 +785,6 @@ TEXTOS = {
         "margem": "com margem",
 
         # execucao
-        "comando": "Comando",
         "executando": "Executando",
         "extraindo": "Extraindo",
         "listando": "Lendo conteúdo",
@@ -780,23 +792,17 @@ TEXTOS = {
         "reescrevendo": "Otimizando",
         "convertendo": "Convertendo para GOD",
         "concluido": "concluído em",
-        "com_erro": "falhou após",
-        "saida_programa": "Saída do programa",
-        "linhas_omitidas": "linha(s) anteriores omitidas",
-        "sucesso_geral": "Tudo certo!",
         "erro_codigo": "O programa terminou com código de erro",
         "erro_bin_sumiu": "Binário não encontrado na hora de executar.",
         "erro_permissao": "Permissão negada ao executar o binário.",
         "erro_inesperado": "Erro inesperado",
         "interrompido": "Interrompido com Ctrl+C. Pode haver arquivos incompletos no destino.",
-        "estimado": "estimado",
 
         # resumo
         "resumo": "RESUMO",
         "r_sucesso": "Sucesso",
         "r_falhas": "Falhas",
         "r_tempo": "Tempo",
-        "r_destino": "Destino",
         "r_log": "Log completo em",
         "r_padrao": "(padrão)",
 
@@ -831,8 +837,6 @@ TEXTOS = {
         # totais
         "arquivos_sel": "arquivo(s) selecionado(s)",
         "total": "total",
-        "processando_item": "Processando",
-        "de": "de",
 
         # config
         "cfg_titulo": "CONFIGURAÇÕES",
@@ -841,7 +845,6 @@ TEXTOS = {
         "c_iso2god": "Caminho do iso2god",
         "c_pasta": "Pasta padrão",
         "c_threads": "Threads para conversão GOD",
-        "c_anim": "Animação da barra",
         "c_cor": "Cores no terminal",
         "c_novo_valor": "Novo valor (ENTER = manter)",
         "c_salvo": "Configuração salva.",
@@ -857,9 +860,7 @@ TEXTOS = {
         # log / sobre
         "log_titulo": "LOG DE EXECUÇÃO",
         "log_vazio": "Ainda não há log registrado.",
-        "log_ultimas": "Últimas entradas",
         "log_erro_ler": "Não foi possível ler o log:",
-        "sobre_titulo": "SOBRE",
         "sobre_1": "Interface unificada para as ferramentas extract-xiso e iso2god.",
         "sobre_2": "extract-xiso trabalha com imagens do Xbox clássico.",
         "sobre_3": "iso2god converte imagens do Xbox 360 para o formato GOD.",
@@ -869,7 +870,6 @@ TEXTOS = {
 
         # binarios
         "bin_faltando_titulo": "FERRAMENTA NÃO ENCONTRADA",
-        "bin_faltando": "Não encontrei o binário:",
         "bin_procurei": "Procurei no PATH e nas pastas comuns.",
         "bin_informe": "Informe o caminho completo agora (ENTER para pular)",
         "bin_pulado": "Você pode configurar depois no menu Configurações.",
@@ -877,8 +877,6 @@ TEXTOS = {
         "bin_configure": "Configure o caminho no menu de configurações.",
     },
     "en": {
-        "subtitulo": "Xbox and Xbox 360 disc image manager",
-        "menu_titulo": "MAIN MENU",
         "escolha": "Choose an option",
         "opcao_invalida": "Invalid option. Try again.",
         "enter_continuar": "Press ENTER to continue",
@@ -891,7 +889,6 @@ TEXTOS = {
         "ate_logo": "See you! Thanks for using XISO Manager.",
         "obrigatorio": "This field is required.",
         "pasta_nao_existe": "Folder does not exist:",
-        "arquivo_nao_existe": "File does not exist:",
         "sem_permissao_leitura": "No read permission on:",
         "sem_permissao_escrita": "Destination is not writable:",
 
@@ -905,6 +902,8 @@ TEXTOS = {
         "e_execucao": "Running",
         "e_selecao": "Selection",
         "arquivos": "files",
+        "r_original_restaurado": "The rewrite failed; the original ISO got its old name back.",
+        "r_original_em": "The original ISO was kept at",
         "nada_a_fazer": "nothing to do — already optimized",
         "r_inertes": "Already optimal",
         "sem_saida": "finished without creating a new file",
@@ -931,8 +930,6 @@ TEXTOS = {
 
         "pronto": "ready",
         "indisponivel": "not found",
-        "ferramentas": "TOOLS",
-        "idioma_atual": "Language",
 
         "nav_titulo": "SELECT FILE",
         "nav_pasta_atual": "Current folder",
@@ -940,14 +937,11 @@ TEXTOS = {
         "nav_digitar": "Type a path",
         "nav_todos": "Select ALL ISOs in this folder",
         "nav_nenhum_iso": "No .iso files found in this folder.",
-        "nav_ajuda": "Number = open/select   |   .. = up   |   c = path   |   0 = back",
         "nav_caminho": "Type the full path",
         "nav_multi": "Numbers separated by comma (e.g. 1,3,5) or range (1-4)",
         "nav_invalido": "Ignored input:",
         "nav_nada": "Nothing selected.",
-        "nav_selecionados": "selected",
 
-        "analisando": "Analyzing",
         "tipo_detectado": "Detected type",
         "iso2god_incompativel": "This iso2god is not compatible: xiso-manager needs the Rust iso2god (converter/info subcommands).",
         "iso2god_onde_baixar": "Download it from https://github.com/lux-insider/xiso-manager/releases and set its path in Settings.",
@@ -960,13 +954,11 @@ TEXTOS = {
         "t_xbox": "Original Xbox (XISO)",
         "t_xbox360": "Xbox 360 (XGD)",
         "t_desconhecido": "Not recognized as an Xbox image",
-        "sugestao": "SUGGESTION",
         "sug_xbox": "This is an original Xbox ISO. Use extract, list or rewrite.",
         "sug_360": "This is an Xbox 360 ISO. Use the GOD conversion.",
         "sug_nada": "Could not identify it. You can still try the options manually.",
         "acoes_sugeridas": "Available actions for this file",
 
-        "disco_titulo": "DISK SPACE",
         "disco_destino": "Destination",
         "disco_necessario": "Required",
         "disco_disponivel": "Available",
@@ -979,7 +971,6 @@ TEXTOS = {
         "disco_seguir": "Continue anyway, with no space guarantee?",
         "margem": "with margin",
 
-        "comando": "Command",
         "executando": "Running",
         "extraindo": "Extracting",
         "listando": "Reading contents",
@@ -987,22 +978,16 @@ TEXTOS = {
         "reescrevendo": "Optimizing",
         "convertendo": "Converting to GOD",
         "concluido": "done in",
-        "com_erro": "failed after",
-        "saida_programa": "Program output",
-        "linhas_omitidas": "earlier line(s) omitted",
-        "sucesso_geral": "All good!",
         "erro_codigo": "The program exited with error code",
         "erro_bin_sumiu": "Binary not found at execution time.",
         "erro_permissao": "Permission denied running the binary.",
         "erro_inesperado": "Unexpected error",
         "interrompido": "Interrupted with Ctrl+C. There may be incomplete files at the destination.",
-        "estimado": "estimated",
 
         "resumo": "SUMMARY",
         "r_sucesso": "Succeeded",
         "r_falhas": "Failed",
         "r_tempo": "Time",
-        "r_destino": "Destination",
         "r_log": "Full log at",
         "r_padrao": "(default)",
 
@@ -1034,8 +1019,6 @@ TEXTOS = {
 
         "arquivos_sel": "file(s) selected",
         "total": "total",
-        "processando_item": "Processing",
-        "de": "of",
 
         "cfg_titulo": "SETTINGS",
         "c_idioma": "Idioma / Language",
@@ -1043,7 +1026,6 @@ TEXTOS = {
         "c_iso2god": "iso2god path",
         "c_pasta": "Default folder",
         "c_threads": "Threads for GOD conversion",
-        "c_anim": "Progress bar animation",
         "c_cor": "Terminal colors",
         "c_novo_valor": "New value (ENTER = keep)",
         "c_salvo": "Settings saved.",
@@ -1058,9 +1040,7 @@ TEXTOS = {
 
         "log_titulo": "EXECUTION LOG",
         "log_vazio": "No log recorded yet.",
-        "log_ultimas": "Latest entries",
         "log_erro_ler": "Could not read the log:",
-        "sobre_titulo": "ABOUT",
         "sobre_1": "Unified interface for the extract-xiso and iso2god tools.",
         "sobre_2": "extract-xiso works with original Xbox disc images.",
         "sobre_3": "iso2god converts Xbox 360 images into the GOD format.",
@@ -1069,7 +1049,6 @@ TEXTOS = {
         "sobre_log": "Log",
 
         "bin_faltando_titulo": "TOOL NOT FOUND",
-        "bin_faltando": "Could not find the binary:",
         "bin_procurei": "Searched PATH and the usual folders.",
         "bin_informe": "Type the full path now (ENTER to skip)",
         "bin_pulado": "You can set it later in the Settings menu.",
@@ -1082,7 +1061,6 @@ def t(chave):
     """Devolve o texto no idioma atual."""
     tabela_idioma = TEXTOS.get(cfg("idioma", "pt")) or TEXTOS["pt"]
     return tabela_idioma.get(chave, TEXTOS["pt"].get(chave, chave))
-
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -1215,12 +1193,16 @@ class Fiscal:
     """
 
     def __init__(self, label, destino, total, emoji="", intervalo=0.25,
-                 alvo_arquivo=False):
+                 alvo_arquivo=False, descontar_inicio=True):
         self.destino = Path(destino) if destino else None
         # Vigiar uma PASTA custa um os.walk a cada tique. Quando o alvo é
         # um arquivo só — caso do -c, que grava um .iso — vigiar a pasta
         # inteira pode significar varrer a home do usuário 4x por segundo.
         self.alvo_arquivo = alvo_arquivo
+        # Na reescrita na mesma pasta o arquivo de saída começa com o tamanho
+        # do ISO original (o extract-xiso o renomeia para .old e grava o novo
+        # do zero): descontar esse tamanho deixaria a barra parada em 0.
+        self.descontar_inicio = descontar_inicio
         self.total = max(0, int(total or 0))
         self.barra = Progresso(label, emoji=emoji, total=self.total)
         self.intervalo = intervalo
@@ -1264,7 +1246,7 @@ class Fiscal:
         return total
 
     def iniciar(self):
-        self._base = self._medir()
+        self._base = self._medir() if self.descontar_inicio else 0
         self._thread = threading.Thread(target=self._rodar, daemon=True)
         self._thread.start()
 
@@ -1319,7 +1301,10 @@ PASTAS_COMUNS = [
 
 NOMES_EXTRACT = ["extract-xiso", "extract_xiso", "extract-xiso-linux"]
 NOMES_ISO2GOD = ["iso2god", "iso2god-linux-x86_64"]
-NOMES_XGDTOOL = ["XGDTool", "xgdtool", "XGDTool-cli", "xgdtool-cli"]
+if WINDOWS:
+    # dentro das pastas o nome precisa do .exe (o shutil.which já resolve)
+    NOMES_EXTRACT = ["extract-xiso.exe"] + NOMES_EXTRACT
+    NOMES_ISO2GOD = ["iso2god.exe"] + NOMES_ISO2GOD
 
 
 def _executavel(caminho):
@@ -1378,21 +1363,12 @@ def resolver_binarios(interativo=True):
         if achado:
             _config["bin_iso2god"] = achado
             mudou = True
-    if not _executavel(cfg("bin_xgdtool", "")):
-        achado = localizar_binario(NOMES_XGDTOOL)
-        if achado:
-            _config["bin_xgdtool"] = achado
-            mudou = True
     if mudou:
         salvar_config()
 
     if not interativo:
         return
 
-    # O XGDTool é opcional: sem ele o programa funciona igual, só não
-    # oferece a reconstrução a partir de pasta extraída. Por isso ele
-    # não entra aqui — perguntar o caminho de algo opcional na primeira
-    # abertura seria atrapalhar quem nem quer usar.
     faltando = []
     if not _executavel(cfg("bin_extract_xiso", "")):
         faltando.append(("extract-xiso", "bin_extract_xiso"))
@@ -1450,10 +1426,6 @@ def iso2god_proprio(binario=None):
     return _ISO2GOD_PROPRIO[binario]
 
 
-def bin_xgd():
-    return cfg("bin_xgdtool", "")
-
-
 def exigir_iso2god():
     """O iso2god configurado existe e é o compatível? Senão, explica o porquê."""
     if not exigir_binario(bin_god(), "iso2god"):
@@ -1491,6 +1463,43 @@ _cache_tipo = {}
 LIMITE_CACHE_TIPO = 4000    # evita crescer sem fim numa sessão longa
 
 
+def _executavel_na_raiz(f, base):
+    """Procura default.xex / default.xbe na tabela do diretório raiz.
+
+    Devolve "xbox360", "xbox" ou None. É a prova de verdade de qual console
+    é o disco; o tamanho do arquivo é só um palpite (um XISO de 360
+    reconstruído ou enxugado fica facilmente abaixo de 6 GB).
+    """
+    try:
+        f.seek(base + 32 * 2048 + len(MAGIC_XBOX))
+        setor, tamanho = struct.unpack("<II", f.read(8))
+        if not 0 < tamanho <= 4 * 1024 * 1024:
+            return None
+        f.seek(base + setor * 2048)
+        tabela = f.read(tamanho)
+    except (OSError, struct.error):
+        return None
+
+    # Árvore binária de entradas: esquerda/direita são deslocamentos em
+    # palavras de 4 bytes dentro da tabela; 0 = sem filho.
+    achados, pendentes, vistos = set(), [0], set()
+    while pendentes and len(vistos) < 4096:
+        pos = pendentes.pop()
+        if pos in vistos or pos + 14 > len(tabela):
+            continue
+        vistos.add(pos)
+        esq, dir_, _setor, _tam, _attr, n = struct.unpack_from("<HHIIBB", tabela, pos)
+        if esq == 0xFFFF:
+            continue
+        achados.add(tabela[pos + 14:pos + 14 + n].decode("latin-1").lower())
+        pendentes += [x * 4 for x in (esq, dir_) if x]
+    if "default.xex" in achados:
+        return "xbox360"
+    if "default.xbe" in achados:
+        return "xbox"
+    return None
+
+
 def detectar_tipo_iso(caminho):
     """Lê a assinatura do ISO. Devolve (tipo, rótulo).
 
@@ -1521,11 +1530,14 @@ def detectar_tipo_iso(caminho):
                 try:
                     f.seek(offset)
                     if f.read(len(MAGIC_XBOX)) == MAGIC_XBOX:
-                        # XGD cru pode ser dos dois; o tamanho separa
-                        if offset == 0x10000 and tamanho > 6 * 1024 ** 3:
-                            resultado = ("xbox360", "XGD cru")
-                        else:
-                            resultado = (tipo, rotulo)
+                        if offset == 0x10000:
+                            # XISO cru pode ser dos dois consoles: a raiz diz
+                            # qual (default.xex ou default.xbe); o tamanho é
+                            # só o último recurso, se a raiz não puder ser lida
+                            tipo = _executavel_na_raiz(f, 0) or (
+                                "xbox360" if tamanho > 6 * 1024 ** 3 else "xbox")
+                            rotulo = "XISO"
+                        resultado = (tipo, rotulo)
                         break
                 except OSError:
                     continue
@@ -1589,15 +1601,6 @@ def _pasta_existente(caminho):
             return os.path.abspath(".")
         alvo = pai
     return alvo
-
-
-def mesmo_disco(a, b):
-    """Diz se dois caminhos estão no mesmo sistema de arquivos."""
-    try:
-        return os.stat(_pasta_existente(a)).st_dev == \
-               os.stat(_pasta_existente(b)).st_dev
-    except OSError:
-        return False
 
 
 def verificar_espaco(destino, necessario_bruto, descricao="", origem=None):
@@ -1709,7 +1712,7 @@ def _limpar_linha_externa(texto):
 
 
 def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
-             max_linhas=10, alvo_arquivo=False):
+             max_linhas=10, alvo_arquivo=False, descontar_inicio=True):
     """Roda a ferramenta externa com a barra de progresso por cima."""
     resultado = Resultado()
 
@@ -1718,7 +1721,7 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
     log_evento("info", "cmd: " + " ".join(cmd))
 
     fiscal = Fiscal(label, destino, total, emoji=emoji,
-                    alvo_arquivo=alvo_arquivo)
+                    alvo_arquivo=alvo_arquivo, descontar_inicio=descontar_inicio)
     fiscal.iniciar()
 
     processo = None
@@ -1788,14 +1791,26 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
         resultado.cancelado = True
         resultado.erro = t("interrompido")
         if processo:
+            # O Ctrl+C já chegou ao filho também (mesmo grupo de processos /
+            # mesmo console). O iso2god, ao recebê-lo, para e APAGA a saída
+            # incompleta: terminar o processo agora interromperia justamente
+            # essa limpeza e deixaria um GOD pela metade no destino. Então
+            # primeiro esperamos; só se ele não sair é que forçamos.
             try:
-                processo.terminate()
-                processo.wait(timeout=5)
+                processo.wait(timeout=30)
+            except KeyboardInterrupt:
+                pass            # segundo Ctrl+C: o usuário quer sair já
             except Exception:
+                pass
+            if processo.poll() is None:
                 try:
-                    processo.kill()
+                    processo.terminate()
+                    processo.wait(timeout=5)
                 except Exception:
-                    pass
+                    try:
+                        processo.kill()
+                    except Exception:
+                        pass
     except Exception as e:
         resultado.erro = f"{t('erro_inesperado')}: {e}"
         log_evento("erro", str(e))
@@ -1890,10 +1905,13 @@ def preparar_destino(pasta):
 
 
 def listar_isos(pasta):
-    achados = []
-    for padrao in ("*.iso", "*.ISO", "*.xiso", "*.XISO"):
-        achados.extend(glob.glob(os.path.join(pasta, padrao)))
-    return sorted(set(achados))
+    try:
+        nomes = os.listdir(pasta)
+    except OSError:
+        return []
+    return sorted(os.path.join(pasta, n) for n in nomes
+                  if n.lower().endswith((".iso", ".xiso"))
+                  and os.path.isfile(os.path.join(pasta, n)))
 
 
 def _expandir_selecao(texto, total):
@@ -2167,9 +2185,20 @@ def acao_extrair(arquivos=None):
     pular = perguntar_sim_nao(t("p_pular_update"), padrao_sim=False)
     flags = opcoes_comuns()
 
+    # Pasta de cada ISO, sempre explícita (-d): sem ela o extract-xiso
+    # extrai na pasta em que o programa foi ABERTO, não na do ISO — e a
+    # barra, a checagem de espaço e o resumo olhariam para o lugar errado.
+    # Com -d ele extrai direto dentro da pasta, então vários ISOs para o
+    # mesmo destino ganham uma subpasta cada (senão os jogos se misturam).
+    def pasta_de(arquivo):
+        base = Path(arquivo).stem
+        if not destino:
+            return os.path.join(os.path.dirname(os.path.abspath(arquivo)), base)
+        return destino if len(arquivos) == 1 else os.path.join(destino, base)
+
     # ── 4. Verificação ───────────────────────────────────────────────────
     print(etapa(4, t("e_verificacao"), total=4))
-    if not verificar_espaco(destino or os.path.dirname(arquivos[0]) or ".", total):
+    if not verificar_espaco(destino or pasta_de(arquivos[0]), total):
         pausar()
         return
     if destino and not preparar_destino(destino):
@@ -2187,16 +2216,13 @@ def acao_extrair(arquivos=None):
     inicio = time.time()
 
     for i, arquivo in enumerate(arquivos, 1):
-        alvo = destino or os.path.join(os.path.dirname(arquivo) or ".",
-                                       Path(arquivo).stem)
+        alvo = pasta_de(arquivo)
         if len(arquivos) > 1:
             print(campo("%d/%d" % (i, len(arquivos)),
                         cortar(os.path.basename(arquivo), 40),
                         EMO["arquivo"], largura_rotulo=8))
 
-        args = [bin_extract(), "-x"]
-        if destino:
-            args += ["-d", destino]
+        args = [bin_extract(), "-x", "-d", alvo]
         if pular:
             args.append("-s")
         args += flags + [arquivo]
@@ -2399,9 +2425,10 @@ def acao_reescrever(arquivos=None):
     flags = opcoes_comuns()
 
     print(etapa(4, t("e_verificacao"), total=4))
-    # sem apagar o original, os dois arquivos coexistem no pico
-    necessario = total if apagar else total * 2
-    if not verificar_espaco(destino or os.path.dirname(arquivos[0]) or ".", necessario):
+    # O original já está no disco; o que precisa estar livre é o espaço do
+    # ISO novo, que nunca é maior que o original — apagando ou não no fim
+    # (o -D só apaga depois que o novo foi gravado).
+    if not verificar_espaco(destino or os.path.dirname(os.path.abspath(arquivos[0])), total):
         pausar()
         return
     if destino and not preparar_destino(destino):
@@ -2424,41 +2451,64 @@ def acao_reescrever(arquivos=None):
                         cortar(os.path.basename(arquivo), 40),
                         EMO["arquivo"], largura_rotulo=8))
 
-        alvo_pasta = destino or (os.path.dirname(arquivo) or ".")
-        antes = set(os.listdir(alvo_pasta)) if os.path.isdir(alvo_pasta) else set()
+        # Saída sempre com -d: sem ele o ISO novo iria para a pasta em que o
+        # programa foi aberto. Na mesma pasta do original, o extract-xiso
+        # renomeia o original para "<nome>.old" e grava o novo com o nome
+        # de sempre — então o resultado se reconhece pelo NOME, não por um
+        # arquivo novo aparecendo na pasta.
+        origem = os.path.abspath(arquivo)
+        pasta_saida = os.path.abspath(destino) if destino else os.path.dirname(origem)
+        saida = os.path.join(pasta_saida, os.path.basename(origem))
+        antigo = saida + ".old"
+        mesma_pasta = os.path.normcase(saida) == os.path.normcase(origem)
+        try:
+            antes = os.stat(saida).st_mtime_ns
+        except OSError:
+            antes = None
 
-        args = [bin_extract(), "-r"]
-        if destino:
-            args += ["-d", destino]
+        args = [bin_extract(), "-r", "-d", pasta_saida]
         if apagar:
             args.append("-D")
         if sem_patch:
             args.append("-m")
-        args += flags + [arquivo]
+        args += flags + [origem]
 
         try:
-            esperado = os.path.getsize(arquivo)
+            esperado = os.path.getsize(origem)
         except OSError:
             esperado = 0
 
         r = executar(args, t("reescrevendo"), EMO["otimizar"],
-                     destino=alvo_pasta, total=esperado)
+                     destino=saida, total=esperado,
+                     alvo_arquivo=True, descontar_inicio=False)
 
-        depois = set(os.listdir(alvo_pasta)) if os.path.isdir(alvo_pasta) else set()
-        novos = [os.path.join(alvo_pasta, n) for n in sorted(depois - antes)]
+        try:
+            depois = os.stat(saida).st_mtime_ns
+        except OSError:
+            depois = None
+        gravou = depois is not None and depois != antes
+
+        # Falha no meio de uma reescrita na mesma pasta: o original ficou
+        # como "<nome>.old" e o ISO de sempre sumiu. Desfaz o nome.
+        if not r.ok and mesma_pasta and not os.path.exists(origem) and os.path.exists(antigo):
+            try:
+                os.replace(antigo, origem)
+                aviso(t("r_original_restaurado"))
+            except OSError as e:
+                erro("%s %s (%s)" % (t("r_original_em"), antigo, e))
 
         # O extract-xiso pula ISOs que já estão otimizados e sai com
-        # código 0. Sem esta checagem, a tela mostraria "sucesso" e uma
-        # lista de arquivos gerados vazia — e o usuário ficaria sem saber
-        # se funcionou.
-        if r.ok and not novos:
+        # código 0, sem gravar nada.
+        if r.ok and not gravou:
             ja_otimizado = any("already optimized" in l.lower()
                                or "skipping" in l.lower() for l in r.saida)
             print(resposta(t("nada_a_fazer") if ja_otimizado else t("sem_saida"),
                            C.CINZA))
             inertes += 1
         elif r.ok:
-            gerados.extend(novos)
+            gerados.append(saida)
+            if os.path.exists(antigo) and not apagar:
+                print(resposta("%s %s" % (t("r_original_em"), encurtar_home(antigo)), C.CINZA))
 
         if r.cancelado:
             falhas += 1

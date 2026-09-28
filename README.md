@@ -67,7 +67,7 @@ Se o binário existir mas não for executável, ele tenta o `chmod +x` sozinho.
 
 ```
 ╭────────────────────────────────────────────────────╮
-│ 💿  xiso-manager  ·  v3.0                          │
+│ 💿  xiso-manager  ·  v3.1                          │
 ╰────────────────────────────────────────────────────╯
 
   ✓ extract-xiso   pronto
@@ -120,12 +120,18 @@ pasta de destino.
 
 **Converter para GOD** — a pasta de destino é obrigatória. Vai exatamente onde você mandar.
 
-**Extrair e Reescrever** — se você digitar uma pasta, vai pra ela. Se apertar ENTER,
-o extract-xiso usa o comportamento padrão dele: cria uma pasta com o nome do ISO
-**no diretório onde você estava quando abriu o programa**.
+**Extrair** — se você digitar uma pasta, o conteúdo vai para ela; com vários ISOs,
+cada um ganha uma subpasta com o nome dele dentro do destino (os jogos não se
+misturam). Se apertar ENTER, cada ISO é extraído numa pasta com o nome dele,
+**ao lado do próprio ISO**.
 
-Digitar o destino sempre é o caminho mais previsível. O `~` funciona
-(`~/Jogos/Extraidos`), e se a pasta não existir ele cria.
+**Reescrever** — se você digitar uma pasta, o ISO otimizado vai para ela. Se apertar
+ENTER, ele fica **na mesma pasta do original**, com o mesmo nome; o original vira
+`<nome>.iso.old` (ou é apagado, se você escolher apagar). Se a reescrita falhar, o
+original volta ao nome de antes.
+
+Nos dois casos o lugar não depende mais da pasta em que você abriu o programa.
+O `~` funciona (`~/Jogos/Extraidos`), e se a pasta não existir ele cria.
 
 ---
 
@@ -135,10 +141,13 @@ Lê a assinatura `MICROSOFT*XBOX*MEDIA` nos offsets conhecidos:
 
 | Offset | Layout | Console |
 |---|---|---|
-| `0x10000` | XISO / XGD cru | Xbox (ou 360, se passar de 6 GB) |
+| `0x10000` | XISO | o que estiver na raiz: `default.xex` = Xbox 360, `default.xbe` = Xbox |
 | `0x18310000` | XGD1 | Xbox |
 | `0xFDA0000` | XGD2 | Xbox 360 |
 | `0x2090000` | XGD3 | Xbox 360 |
+
+No XISO (sem partição de vídeo) a assinatura não diz o console: quem diz é o
+executável na raiz do disco. O tamanho só é usado se a raiz não puder ser lida.
 
 O resultado aparece na coluna CONSOLE da tabela de seleção, antes de você escolher,
 e é cacheado para a lista não reler os arquivos a cada redesenho.
@@ -167,9 +176,10 @@ sem `\r`.
 ## Segurança
 
 - Verifica espaço em disco **antes** de gravar, com 15% de margem
-- Na reescrita, exige o dobro do espaço se você não for apagar o original
+- Na reescrita, exige espaço para o ISO novo (o original já está no disco)
 - Confirmação dupla antes de apagar ISOs originais
-- `Ctrl+C` encerra o processo filho de forma limpa e avisa sobre arquivos incompletos
+- `Ctrl+C` espera o iso2god apagar a conversão incompleta antes de encerrar (um
+  segundo `Ctrl+C` sai na hora)
 - Cria a pasta de destino se não existir e confere permissão de escrita
 - Cada arquivo é processado individualmente, então um erro não derruba o lote inteiro
 
@@ -211,11 +221,8 @@ O log pode ser consultado direto no menu, opção **[l]** — erros em vermelho,
 
 | Código | Significado |
 |---|---|
-| 0 | sucesso |
-| 1 | erro geral |
-| 2 | ferramenta ausente |
-| 3 | espaço insuficiente |
-| 4 | arquivo inválido |
+| 0 | saiu pelo menu |
+| 1 | erro fatal |
 | 130 | interrompido com Ctrl+C |
 
 ---
