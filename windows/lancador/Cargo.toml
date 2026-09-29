@@ -1,6 +1,6 @@
 [package]
 name = "xiso-manager"
-version = "3.1.0"
+version = "3.1.1"
 edition = "2021"
 description = "Lançador do xiso-manager no Windows: roda o xiso_manager.py com o Python portátil que vai junto"
 license = "MIT"
