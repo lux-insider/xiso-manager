@@ -141,7 +141,7 @@ pasta de destino.
 | **4 Listar** | extract-xiso-pt | Mostra os arquivos de dentro do ISO sem extrair nada. |
 | **5 Criar** | extract-xiso-pt | Monta um ISO a partir da pasta de um jogo de Xbox ou de Xbox 360. Aceita várias pastas na mesma execução. Em jogo de Xbox, oferece liberar o `default.xbe` para qualquer mídia (desligado por padrão). |
 | **6 Reescrever** | extract-xiso-pt | Deixa o ISO enxuto (tira a partição de vídeo e o espaço vazio). Sem apagar, o novo fica ao lado como `nome.xiso.iso`; apagando, o original só é trocado depois que o novo foi gravado e conferido. |
-| **v Verificar** | extract-xiso-pt | Confere a estrutura, lê o ISO inteiro e mostra CRC32, MD5 e SHA-1. Com um `.dat` do Redump, diz se é a imagem original do disco. |
+| **v Verificar** | extract-xiso-pt | Confere a estrutura, lê o ISO inteiro e mostra CRC32, MD5 e SHA-1. Com os `.dat` do Redump instalados, diz se é a imagem original do disco. Para instalar, informe o `.zip` baixado do [redump.org](http://redump.org/downloads/) na primeira pergunta (só uma vez). |
 | **7 Assistente** | ambas | Lê a assinatura do ISO, diz de qual console é e mostra só as ações que fazem sentido. A recomendada vem marcada com ⭐ e ENTER aceita ela direto. |
 | **8 Lote** | ambas | Varre uma pasta inteira, separa os ISOs por console e oferece a ação certa para cada grupo. |
 | **9 Manual** | ambas | Passa argumentos direto pro binário, como no terminal. |

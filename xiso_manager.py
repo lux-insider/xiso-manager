@@ -725,13 +725,14 @@ TEXTOS = {
         "so_le": "lê, não cria",
         "m_verificar": "Verificar integridade do ISO",
         "d_verificar": "Confere a estrutura, lê o ISO inteiro e calcula CRC32/MD5/SHA-1; com um .dat do Redump, diz se é a imagem original.",
-        "p_dat": "Arquivo .dat do Redump para comparar (ENTER = só calcular os hashes)",
+        "p_dat": "Instalar um .dat ou .zip do Redump? Caminho do arquivo (ENTER = usar os já instalados)",
         "dat_nao_existe": "Arquivo .dat não encontrado:",
         "p_liberar_midia": "Liberar o default.xbe para rodar de qualquer mídia (HD, DVD gravado)? Muda só a cópia no ISO novo",
         "p_sobrescrever_pasta": "já tem arquivos. Extrair por cima?",
         "p_sobrescrever_iso": "já existe. Substituir?",
         "pulado": "pulado",
         "verificando": "Verificando",
+        "instalando_dat": "Instalando .dat",
         "precisa_pt": "Esta função precisa do extract-xiso-pt (configure o caminho em Configurações).",
         "r_substituido": "O original foi trocado pelo ISO reescrito.",
 
@@ -927,13 +928,14 @@ TEXTOS = {
         "so_le": "reads, cannot create",
         "m_verificar": "Verify ISO integrity",
         "d_verificar": "Checks the structure, reads the whole ISO and computes CRC32/MD5/SHA-1; with a Redump .dat, tells whether it is the original image.",
-        "p_dat": "Redump .dat file to compare against (ENTER = only compute hashes)",
+        "p_dat": "Install a Redump .dat or .zip? File path (ENTER = use the installed ones)",
         "dat_nao_existe": ".dat file not found:",
         "p_liberar_midia": "Let default.xbe run from any media (HDD, burned DVD)? Changes only the copy in the new ISO",
         "p_sobrescrever_pasta": "already has files. Extract over it?",
         "p_sobrescrever_iso": "already exists. Replace it?",
         "pulado": "skipped",
         "verificando": "Verifying",
+        "instalando_dat": "Installing .dat",
         "precisa_pt": "This needs extract-xiso-pt (set its path in Settings).",
         "r_substituido": "The original was replaced by the rewritten ISO.",
 
@@ -1726,12 +1728,15 @@ def _linhas_verificado(evento):
     if dat:
         situacao = dat.get("situacao")
         if situacao == "confere":
-            linhas.append("CONFERE com o .dat: %s" % dat.get("jogo", "?"))
+            linhas.append("ORIGINAL: idêntica ao Redump — %s" % dat.get("jogo", "?"))
         elif situacao == "nao_confere":
-            linhas.append("NÃO CONFERE: o .dat tem %s com outro SHA-1" % dat.get("rom", "?"))
+            linhas.append("NÃO CONFERE: o Redump tem %s com outro SHA-1 "
+                          "(modificada, corrompida ou outra versão)" % dat.get("rom", "?"))
         else:
-            linhas.append("o SHA-1 não está no .dat"
-                          + (" (ISO enxuta nunca confere com o Redump)" if completo is None else ""))
+            linhas.append("não está no Redump"
+                          + (" (ISO enxuta nunca confere)" if completo is None else ""))
+    elif not evento.get("dats_usados"):
+        linhas.append("sem .dat do Redump instalado: só a integridade foi conferida")
     return linhas
 
 
@@ -2731,12 +2736,20 @@ def acao_verificar(arquivos=None):
     resumo_selecao(arquivos)
 
     print(etapa(2, t("e_opcoes"), total=3))
+    # Os .dat ficam instalados no extract-xiso-pt; aqui só se instala um
+    # novo, se o usuário quiser. O verificar usa todos os instalados.
     dat = perguntar(t("p_dat"), obrigatorio=False)
     dat = os.path.expanduser(dat.strip().strip('"').strip("'")) if dat else ""
-    if dat and not os.path.isfile(dat):
-        erro("%s %s" % (t("dat_nao_existe"), dat))
-        pausar()
-        return
+    if dat:
+        if not os.path.isfile(dat):
+            erro("%s %s" % (t("dat_nao_existe"), dat))
+            pausar()
+            return
+        r = executar([bin_extract(), "dats", "instalar", dat], t("instalando_dat"),
+                     EMO["analisar"], max_linhas=4)
+        if not r.ok:
+            pausar()
+            return
 
     print(etapa(3, t("e_resultado"), total=3))
     ok = falhas = 0
@@ -2747,13 +2760,11 @@ def acao_verificar(arquivos=None):
                         cortar(os.path.basename(arquivo), 40),
                         EMO["arquivo"], largura_rotulo=8))
         args = [bin_extract(), "verificar", arquivo, "--progresso-json"]
-        if dat:
-            args += ["--dat", dat]
         try:
             esperado = os.path.getsize(arquivo)
         except OSError:
             esperado = 0
-        # código 2: íntegro, mas não confere com o .dat (conta como falha)
+        # código 2: o Redump tem este jogo com outro SHA-1 (conta como falha)
         r = executar(args, t("verificando"), EMO["analisar"],
                      total=esperado, max_linhas=16)
         if r.cancelado:
