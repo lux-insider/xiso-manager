@@ -66,7 +66,7 @@ EXIT_ERRO = 1
 EXIT_INTERROMPIDO = 130
 
 APP_NOME = "xiso-manager"
-APP_VERSAO = "3.1.1"
+APP_VERSAO = "3.2.0"
 
 
 def _pasta_base():
@@ -723,6 +723,17 @@ TEXTOS = {
         "g_geral": "Geral",
         "g_sistema": "Sistema",
         "so_le": "lê, não cria",
+        "m_verificar": "Verificar integridade do ISO",
+        "d_verificar": "Confere a estrutura, lê o ISO inteiro e calcula CRC32/MD5/SHA-1; com um .dat do Redump, diz se é a imagem original.",
+        "p_dat": "Arquivo .dat do Redump para comparar (ENTER = só calcular os hashes)",
+        "dat_nao_existe": "Arquivo .dat não encontrado:",
+        "p_liberar_midia": "Liberar o default.xbe para rodar de qualquer mídia (HD, DVD gravado)? Muda só a cópia no ISO novo",
+        "p_sobrescrever_pasta": "já tem arquivos. Extrair por cima?",
+        "p_sobrescrever_iso": "já existe. Substituir?",
+        "pulado": "pulado",
+        "verificando": "Verificando",
+        "precisa_pt": "Esta função precisa do extract-xiso-pt (configure o caminho em Configurações).",
+        "r_substituido": "O original foi trocado pelo ISO reescrito.",
 
         "m_assistente": "Assistente (detecta o ISO e sugere o que fazer)",
         "m_extrair": "Extrair conteúdo de ISO",
@@ -861,8 +872,8 @@ TEXTOS = {
         "log_titulo": "LOG DE EXECUÇÃO",
         "log_vazio": "Ainda não há log registrado.",
         "log_erro_ler": "Não foi possível ler o log:",
-        "sobre_1": "Interface unificada para as ferramentas extract-xiso e iso2god.",
-        "sobre_2": "extract-xiso trabalha com imagens do Xbox clássico.",
+        "sobre_1": "Interface unificada para as ferramentas extract-xiso-pt e iso2god.",
+        "sobre_2": "extract-xiso-pt lista, extrai, cria, otimiza e verifica ISOs de Xbox e Xbox 360.",
         "sobre_3": "iso2god converte imagens do Xbox 360 para o formato GOD.",
         "sobre_4": "Nenhuma biblioteca externa é necessária.",
         "sobre_config": "Configuração",
@@ -914,6 +925,17 @@ TEXTOS = {
         "g_geral": "General",
         "g_sistema": "System",
         "so_le": "reads, cannot create",
+        "m_verificar": "Verify ISO integrity",
+        "d_verificar": "Checks the structure, reads the whole ISO and computes CRC32/MD5/SHA-1; with a Redump .dat, tells whether it is the original image.",
+        "p_dat": "Redump .dat file to compare against (ENTER = only compute hashes)",
+        "dat_nao_existe": ".dat file not found:",
+        "p_liberar_midia": "Let default.xbe run from any media (HDD, burned DVD)? Changes only the copy in the new ISO",
+        "p_sobrescrever_pasta": "already has files. Extract over it?",
+        "p_sobrescrever_iso": "already exists. Replace it?",
+        "pulado": "skipped",
+        "verificando": "Verifying",
+        "precisa_pt": "This needs extract-xiso-pt (set its path in Settings).",
+        "r_substituido": "The original was replaced by the rewritten ISO.",
 
         "m_assistente": "Wizard (detect the ISO and suggest what to do)",
         "m_extrair": "Extract ISO contents",
@@ -1041,8 +1063,8 @@ TEXTOS = {
         "log_titulo": "EXECUTION LOG",
         "log_vazio": "No log recorded yet.",
         "log_erro_ler": "Could not read the log:",
-        "sobre_1": "Unified interface for the extract-xiso and iso2god tools.",
-        "sobre_2": "extract-xiso works with original Xbox disc images.",
+        "sobre_1": "Unified interface for the extract-xiso-pt and iso2god tools.",
+        "sobre_2": "extract-xiso-pt lists, extracts, creates, optimizes and verifies Xbox and Xbox 360 ISOs.",
         "sobre_3": "iso2god converts Xbox 360 images into the GOD format.",
         "sobre_4": "No external libraries required.",
         "sobre_config": "Config",
@@ -1299,11 +1321,11 @@ PASTAS_COMUNS = [
     Path.cwd(),
 ]
 
-NOMES_EXTRACT = ["extract-xiso", "extract_xiso", "extract-xiso-linux"]
+NOMES_EXTRACT = ["extract-xiso-pt", "extract-xiso", "extract_xiso", "extract-xiso-linux"]
 NOMES_ISO2GOD = ["iso2god", "iso2god-linux-x86_64"]
 if WINDOWS:
     # dentro das pastas o nome precisa do .exe (o shutil.which já resolve)
-    NOMES_EXTRACT = ["extract-xiso.exe"] + NOMES_EXTRACT
+    NOMES_EXTRACT = ["extract-xiso-pt.exe", "extract-xiso.exe"] + NOMES_EXTRACT
     NOMES_ISO2GOD = ["iso2god.exe"] + NOMES_ISO2GOD
 
 
@@ -1687,6 +1709,32 @@ def _evento_json(linha):
     return evento if isinstance(evento, dict) and "evento" in evento else None
 
 
+def _linhas_verificado(evento):
+    """Relatório do `verificar --progresso-json` do extract-xiso-pt."""
+    h = evento.get("hashes") or {}
+    completo = evento.get("disco_completo")
+    linhas = ["%s · %s" % (evento.get("layout", "?"),
+                           "disco completo" if completo else
+                           "enxuta" if completo is None else "tamanho fora do padrão"),
+              "estrutura íntegra · %s arquivos em %s pastas"
+              % (evento.get("arquivos", "?"), evento.get("diretorios", "?"))]
+    linhas += ["aviso: " + a for a in evento.get("avisos") or []]
+    for nome in ("crc32", "md5", "sha1"):
+        if h.get(nome):
+            linhas.append("%-6s %s" % (nome.upper(), h[nome]))
+    dat = evento.get("dat")
+    if dat:
+        situacao = dat.get("situacao")
+        if situacao == "confere":
+            linhas.append("CONFERE com o .dat: %s" % dat.get("jogo", "?"))
+        elif situacao == "nao_confere":
+            linhas.append("NÃO CONFERE: o .dat tem %s com outro SHA-1" % dat.get("rom", "?"))
+        else:
+            linhas.append("o SHA-1 não está no .dat"
+                          + (" (ISO enxuta nunca confere com o Redump)" if completo is None else ""))
+    return linhas
+
+
 def _texto_evento(evento):
     """Texto legível de um evento `fase`/`concluido`/`erro` do iso2god."""
     tipo = evento.get("evento")
@@ -1751,6 +1799,11 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
                 # evento. O progresso vira a barra; o resto, texto legível.
                 evento = _evento_json(linha)
                 if evento is not None:
+                    if evento.get("evento") == "verificado":
+                        for l in _linhas_verificado(evento):
+                            resultado.saida.append(l)
+                            resultado.total_linhas += 1
+                        continue
                     if evento.get("evento") == "progresso":
                         total_bytes = evento.get("total_bytes") or 0
                         if total_bytes:
@@ -2151,8 +2204,37 @@ def tela(titulo, emoji, descricao, cor_borda=None):
 # AÇÕES — EXTRACT-XISO
 # ═════════════════════════════════════════════════════════════════════════
 
+def eh_pt():
+    """O extrator configurado é o extract-xiso-pt (senão, o oficial)."""
+    return "extract-xiso-pt" in os.path.basename(bin_extract() or "").lower()
+
+
 def opcoes_comuns():
+    if eh_pt():
+        return []  # o extract-xiso-pt fala por eventos JSON, não tem modo silencioso
     return ["-q"] if perguntar_sim_nao(t("p_silencioso"), padrao_sim=False) else []
+
+
+def _tem_xbe(pasta):
+    try:
+        return any(n.lower() == "default.xbe" and os.path.isfile(os.path.join(pasta, n))
+                   for n in os.listdir(pasta))
+    except OSError:
+        return False
+
+
+def _pode_sobrescrever(caminho, eh_pasta):
+    """Destino já ocupado: pergunta antes (o extract-xiso-pt nunca grava por cima sozinho)."""
+    if eh_pasta:
+        ocupado = os.path.isdir(caminho) and bool(os.listdir(caminho))
+        chave = "p_sobrescrever_pasta"
+    else:
+        ocupado = os.path.exists(caminho)
+        chave = "p_sobrescrever_iso"
+    if not ocupado:
+        return False, True
+    sim = perguntar_sim_nao("%s %s" % (encurtar_home(caminho), t(chave)), padrao_sim=False)
+    return sim, sim
 
 
 def acao_extrair(arquivos=None):
@@ -2222,10 +2304,21 @@ def acao_extrair(arquivos=None):
                         cortar(os.path.basename(arquivo), 40),
                         EMO["arquivo"], largura_rotulo=8))
 
-        args = [bin_extract(), "-x", "-d", alvo]
-        if pular:
-            args.append("-s")
-        args += flags + [arquivo]
+        if eh_pt():
+            sobrescrever, seguir = _pode_sobrescrever(alvo, eh_pasta=True)
+            if not seguir:
+                print(resposta(t("pulado"), C.CINZA))
+                continue
+            args = [bin_extract(), "extrair", arquivo, "-d", alvo, "--progresso-json"]
+            if pular:
+                args.append("-s")
+            if sobrescrever:
+                args.append("--sobrescrever")
+        else:
+            args = [bin_extract(), "-x", "-d", alvo]
+            if pular:
+                args.append("-s")
+            args += flags + [arquivo]
 
         try:
             esperado = os.path.getsize(arquivo)
@@ -2269,7 +2362,8 @@ def acao_listar(arquivos=None):
         if len(arquivos) > 1:
             print(campo(t("nav_titulo"), cortar(os.path.basename(arquivo), 40),
                         EMO["arquivo"], largura_rotulo=10))
-        r = executar([bin_extract(), "-l", arquivo], t("listando"),
+        cmd = [bin_extract(), "listar", arquivo] if eh_pt() else [bin_extract(), "-l", arquivo]
+        r = executar(cmd, t("listando"),
                      EMO["listar"], max_linhas=40)
         if r.cancelado:
             falhas += 1
@@ -2341,7 +2435,13 @@ def acao_criar():
 
     # ── 3. Opções ────────────────────────────────────────────────────────
     print(etapa(3, t("e_opcoes"), total=4))
-    sem_patch = perguntar_sim_nao(t("p_sem_patch"), padrao_sim=False)
+    sem_patch = liberar = False
+    if eh_pt():
+        # só jogos de Xbox têm default.xbe; e só mexe se o usuário pedir
+        if any(_tem_xbe(tr["origem"]) for tr in trabalhos):
+            liberar = perguntar_sim_nao(t("p_liberar_midia"), padrao_sim=False)
+    else:
+        sem_patch = perguntar_sim_nao(t("p_sem_patch"), padrao_sim=False)
     flags = opcoes_comuns()
 
     # ── 4. Verificação ───────────────────────────────────────────────────
@@ -2368,12 +2468,23 @@ def acao_criar():
                         os.path.basename(os.path.normpath(tr["origem"])),
                         EMO["pasta"], largura_rotulo=8))
 
-        args = [bin_extract(), "-c", tr["origem"]]
-        if tr["saida"]:
-            args.append(tr["saida"])
-        if sem_patch:
-            args.append("-m")
-        args += flags
+        if eh_pt():
+            sobrescrever, seguir = _pode_sobrescrever(tr["alvo"], eh_pasta=False)
+            if not seguir:
+                print(resposta(t("pulado"), C.CINZA))
+                continue
+            args = [bin_extract(), "criar", tr["origem"], "-s", tr["alvo"], "--progresso-json"]
+            if liberar and _tem_xbe(tr["origem"]):
+                args.append("--liberar-midia")
+            if sobrescrever:
+                args.append("--sobrescrever")
+        else:
+            args = [bin_extract(), "-c", tr["origem"]]
+            if tr["saida"]:
+                args.append(tr["saida"])
+            if sem_patch:
+                args.append("-m")
+            args += flags
 
         r = executar(args, t("criando"), EMO["criar"],
                      destino=tr["alvo"], total=tr["tamanho"],
@@ -2421,7 +2532,12 @@ def acao_reescrever(arquivos=None):
         if not perguntar_sim_nao(t("confirmar"), padrao_sim=False):
             apagar = False
             print(resposta(t("cancelado")))
-    sem_patch = perguntar_sim_nao(t("p_sem_patch"), padrao_sim=False)
+    sem_patch = liberar = False
+    if eh_pt():
+        if any(detectar_tipo_iso(a)[0] == "xbox" for a in arquivos):
+            liberar = perguntar_sim_nao(t("p_liberar_midia"), padrao_sim=False)
+    else:
+        sem_patch = perguntar_sim_nao(t("p_sem_patch"), padrao_sim=False)
     flags = opcoes_comuns()
 
     print(etapa(4, t("e_verificacao"), total=4))
@@ -2440,6 +2556,9 @@ def acao_reescrever(arquivos=None):
         return
 
     print(etapa("", t("e_execucao")))
+    if eh_pt():
+        _reescrever_pt(arquivos, destino, apagar, liberar)
+        return
     ok = falhas = 0
     inertes = 0
     gerados = []
@@ -2522,6 +2641,128 @@ def acao_reescrever(arquivos=None):
 
     mostrar_resumo(t("m_reescrever"), ok, falhas, time.time() - inicio,
                    extras=extras, produzidos=gerados)
+    pausar()
+
+
+def _reescrever_pt(arquivos, destino, apagar, liberar):
+    """Reescrita com o extract-xiso-pt.
+
+    Ele nunca mexe no original durante a gravação: o ISO novo é gravado à
+    parte, relido e só então ganha o nome final. Sem destino e sem apagar,
+    o novo fica ao lado como "<nome>.xiso.iso"; apagando na mesma pasta, o
+    --substituir troca o original só no fim; com destino, o novo vai para
+    lá com o mesmo nome e o original só é apagado depois do sucesso.
+    """
+    ok = falhas = 0
+    gerados = []
+    inicio = time.time()
+
+    for i, arquivo in enumerate(arquivos, 1):
+        if len(arquivos) > 1:
+            print(campo("%d/%d" % (i, len(arquivos)),
+                        cortar(os.path.basename(arquivo), 40),
+                        EMO["arquivo"], largura_rotulo=8))
+        origem = os.path.abspath(arquivo)
+        pasta_saida = os.path.abspath(destino) if destino else os.path.dirname(origem)
+        saida = os.path.join(pasta_saida, os.path.basename(origem))
+        mesma_pasta = os.path.normcase(saida) == os.path.normcase(origem)
+
+        args = [bin_extract(), "reescrever", origem, "--progresso-json"]
+        if mesma_pasta and apagar:
+            args.append("--substituir")
+            saida = origem
+        else:
+            if mesma_pasta:
+                saida = os.path.join(pasta_saida, Path(origem).stem + ".xiso.iso")
+            sobrescrever, seguir = _pode_sobrescrever(saida, eh_pasta=False)
+            if not seguir:
+                print(resposta(t("pulado"), C.CINZA))
+                continue
+            args += ["-s", saida]
+            if sobrescrever:
+                args.append("--sobrescrever")
+        if liberar and detectar_tipo_iso(origem)[0] == "xbox":
+            args.append("--liberar-midia")
+
+        try:
+            esperado = os.path.getsize(origem)
+        except OSError:
+            esperado = 0
+        r = executar(args, t("reescrevendo"), EMO["otimizar"],
+                     destino=saida, total=esperado,
+                     alvo_arquivo=True, descontar_inicio=False)
+        if r.ok:
+            gerados.append(saida)
+            if saida == origem:
+                print(resposta(t("r_substituido"), C.CINZA))
+            elif apagar:
+                try:
+                    os.remove(origem)
+                except OSError as e:
+                    erro("%s (%s)" % (origem, e))
+        if r.cancelado:
+            falhas += 1
+            break
+        ok += 1 if r.ok else 0
+        falhas += 0 if r.ok else 1
+
+    extras = [(t("p_apagar_antigo"), "sim" if apagar else "não", EMO["lixo"])]
+    mostrar_resumo(t("m_reescrever"), ok, falhas, time.time() - inicio,
+                   extras=extras, produzidos=gerados)
+    pausar()
+
+
+def acao_verificar(arquivos=None):
+    tela(t("m_verificar"), EMO["analisar"], t("d_verificar"), C.CIANO)
+    if not exigir_binario(bin_extract(), "extract-xiso-pt"):
+        pausar()
+        return
+    if not eh_pt():
+        aviso(t("precisa_pt"))
+        pausar()
+        return
+
+    if arquivos is None:
+        arquivos = navegador()
+    if not arquivos:
+        return
+
+    print(etapa(1, t("e_selecao"), total=3))
+    resumo_selecao(arquivos)
+
+    print(etapa(2, t("e_opcoes"), total=3))
+    dat = perguntar(t("p_dat"), obrigatorio=False)
+    dat = os.path.expanduser(dat.strip().strip('"').strip("'")) if dat else ""
+    if dat and not os.path.isfile(dat):
+        erro("%s %s" % (t("dat_nao_existe"), dat))
+        pausar()
+        return
+
+    print(etapa(3, t("e_resultado"), total=3))
+    ok = falhas = 0
+    inicio = time.time()
+    for i, arquivo in enumerate(arquivos, 1):
+        if len(arquivos) > 1:
+            print(campo("%d/%d" % (i, len(arquivos)),
+                        cortar(os.path.basename(arquivo), 40),
+                        EMO["arquivo"], largura_rotulo=8))
+        args = [bin_extract(), "verificar", arquivo, "--progresso-json"]
+        if dat:
+            args += ["--dat", dat]
+        try:
+            esperado = os.path.getsize(arquivo)
+        except OSError:
+            esperado = 0
+        # código 2: íntegro, mas não confere com o .dat (conta como falha)
+        r = executar(args, t("verificando"), EMO["analisar"],
+                     total=esperado, max_linhas=16)
+        if r.cancelado:
+            falhas += 1
+            break
+        ok += 1 if r.ok else 0
+        falhas += 0 if r.ok else 1
+
+    mostrar_resumo(t("m_verificar"), ok, falhas, time.time() - inicio)
     pausar()
 
 
@@ -2734,6 +2975,14 @@ def acao_assistente():
             (EMO["god"], t("m_god"), t("d_god"), lambda: acao_god(arquivos)),
             (EMO["analisar"], t("m_info_god"), t("d_info_god"), lambda: acao_info_god(arquivos)),
         ]
+        if eh_pt():
+            escolhas += [
+                (EMO["extrair"], t("m_extrair"), t("d_extrair"), lambda: acao_extrair(arquivos)),
+                (EMO["otimizar"], t("m_reescrever"), t("d_reescrever"), lambda: acao_reescrever(arquivos)),
+            ]
+    if eh_pt() and tipo in ("xbox", "xbox360"):
+        escolhas.append((EMO["analisar"], t("m_verificar"), t("d_verificar"),
+                         lambda: acao_verificar(arquivos)))
     else:
         dica(t("sug_nada"))
         escolhas = [
@@ -2839,14 +3088,18 @@ def acao_lote():
 def acao_manual():
     tela(t("m_manual"), EMO["manual"], t("d_manual"), C.AMARE)
 
-    print(opcao("1", "extract-xiso", EMO["extrair"]))
+    print(opcao("1", "extract-xiso-pt" if eh_pt() else "extract-xiso", EMO["extrair"]))
     print(opcao("2", "iso2god", EMO["god"]))
     print(opcao("0", t("voltar"), EMO["sair"], C.VERM))
 
     qual = perguntar(t("escolha"), obrigatorio=False).strip()
     if qual == "1":
-        binario, nome = bin_extract(), "extract-xiso"
-        exemplo = "-x -s -d ~/Extraidos jogo.iso"
+        if eh_pt():
+            binario, nome = bin_extract(), "extract-xiso-pt"
+            exemplo = "extrair jogo.iso -d ~/Extraidos"
+        else:
+            binario, nome = bin_extract(), "extract-xiso"
+            exemplo = "-x -s -d ~/Extraidos jogo.iso"
     elif qual == "2":
         binario, nome = bin_god(), "iso2god"
         exemplo = "converter -j 4 --padding parcial jogo.iso ~/GOD"
@@ -3018,6 +3271,7 @@ def itens_menu():
         ("4", EMO["listar"], t("m_listar"), acao_listar),
         ("5", EMO["criar"], t("m_criar"), acao_criar),
         ("6", EMO["otimizar"], t("m_reescrever"), acao_reescrever),
+        ("v", EMO["analisar"], t("m_verificar"), acao_verificar),
         ("7", EMO["assistente"], t("m_assistente"), acao_assistente),
         ("8", EMO["lote"], t("m_lote"), acao_lote),
         ("9", EMO["manual"], t("m_manual"), acao_manual),
@@ -3040,6 +3294,14 @@ def grupos_menu():
     # azul e o último termina no verde. Cada grupo recebe a sua faixa da
     # escala, então tudo fica em gradiente sem que os grupos virem a mesma
     # coisa — a posição na tela também vira informação.
+    if eh_pt():
+        # o extract-xiso-pt também cria e reescreve ISOs de 360
+        return [
+            (t("g_360"), "iso2god", "", ["1", "2"]),
+            (t("g_ambos"), "extract-xiso-pt", "", ["3", "4", "5", "6", "v"]),
+            (t("g_geral"), "", "", ["7", "8", "9"]),
+            (t("g_sistema"), "", "", ["c", "l", "s"]),
+        ]
     return [
         (t("g_360"), "iso2god", "", ["1", "2"]),
         (t("g_ambos"), "extract-xiso", t("so_le"), ["3", "4"]),
@@ -3111,7 +3373,7 @@ def mostrar_menu():
     # Bolinha em vez de ✓: verde para pronto, vermelho para ausente.
     # A cor faz o estado saltar aos olhos sem precisar ler a palavra.
     for caminho, nome, cor_dono in ((bin_god(), "iso2god", C.AZUL),
-                                    (bin_extract(), "extract-xiso", C.VERDE)):
+                                    (bin_extract(), "extract-xiso-pt" if eh_pt() else "extract-xiso", C.VERDE)):
         pronto = _executavel(caminho)
         print("  %s %s%s" % (
             cor(SIM_PONTO, C.VERDE if pronto else C.VERM),

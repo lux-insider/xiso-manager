@@ -1,6 +1,6 @@
 # xiso-manager
 
-Gerenciador interativo para **extract-xiso** (Xbox clássico) e **iso2god** (Xbox 360).
+Gerenciador interativo para **extract-xiso-pt** (ISOs de Xbox e Xbox 360) e **iso2god** (Xbox 360 → GOD).
 Um arquivo só, sem dependência nenhuma além do Python que já vem no Linux.
 
 ---
@@ -18,13 +18,16 @@ Ele usa duas ferramentas externas. As duas, para Linux x86_64 (glibc 2.34+),
 estão prontas na página de
 [Releases](https://github.com/lux-insider/xiso-manager/releases):
 
-- **extract-xiso** (Xbox clássico) — build oficial do
-  [XboxDev/extract-xiso](https://github.com/XboxDev/extract-xiso), v2.7.1,
-  sem modificação. A licença dele vai junto: `extract-xiso-LICENSE.TXT`.
+- **extract-xiso-pt** — [lux-insider/extract-xiso-pt](https://github.com/lux-insider/extract-xiso-pt):
+  lista, extrai, cria, reescreve e verifica ISOs de Xbox e Xbox 360.
 - **iso2god** (Xbox 360) — veja [Qual iso2god](#qual-iso2god)
 
-Baixe, dê `chmod +x extract-xiso iso2god` e deixe na pasta da ferramenta (ou em
+Baixe, dê `chmod +x extract-xiso-pt iso2god` e deixe na pasta da ferramenta (ou em
 qualquer lugar do `PATH`).
+
+O [extract-xiso](https://github.com/XboxDev/extract-xiso) oficial do XboxDev
+continua funcionando: aponte o caminho dele em **Configurações** e o menu volta
+às opções dele (sem o Verificar).
 
 Para chamar de qualquer lugar, adicione ao `~/.bashrc`:
 
@@ -38,7 +41,7 @@ Depois `source ~/.bashrc` uma vez. Daí em diante é só `xiso`.
 
 ### Windows
 
-Baixe o `xiso-manager-3.1.1-windows-x64.zip` da página de
+Baixe o `xiso-manager-3.2.0-windows-x64.zip` da página de
 [Releases](https://github.com/lux-insider/xiso-manager/releases), descompacte a
 pasta inteira e dê dois cliques em **`xiso-manager.exe`**. Roda no Windows 10/11
 (64 bits) sem instalar nada: a pasta já traz tudo.
@@ -47,7 +50,7 @@ pasta inteira e dê dois cliques em **`xiso-manager.exe`**. Roda no Windows 10/1
 xiso-manager.exe          lançador (abre o programa)
 xiso_manager.py           o programa
 python\                   Python portátil oficial (python.org, "embeddable")
-extract-xiso.exe          build oficial do XboxDev para Windows, sem modificação
+extract-xiso-pt.exe       extract-xiso-pt, em português
 iso2god.exe               iso2god em Rust, em português
 ```
 
@@ -78,7 +81,7 @@ se um deles estiver configurado, o xiso-manager avisa e diz onde baixar o certo.
 
 ### Detecção automática dos binários
 
-Na primeira execução ele procura `extract-xiso` e `iso2god` nesta ordem:
+Na primeira execução ele procura `extract-xiso-pt` (ou, na falta dele, o `extract-xiso`) e `iso2god` nesta ordem:
 
 1. `PATH`
 2. A própria pasta da ferramenta
@@ -95,10 +98,10 @@ Se o binário existir mas não for executável, ele tenta o `chmod +x` sozinho.
 
 ```
 ╭────────────────────────────────────────────────────╮
-│ 💿  xiso-manager  ·  v3.1.1                        │
+│ 💿  xiso-manager  ·  v3.2.0                        │
 ╰────────────────────────────────────────────────────╯
 
-  ✓ extract-xiso   pronto
+  ✓ extract-xiso-pt pronto
   ✓ iso2god        pronto
 
 ──────────────────────────────────────────────────────
@@ -106,12 +109,12 @@ Se o binário existir mas não for executável, ele tenta o `chmod +x` sozinho.
   ── Xbox 360 ─────────────────────────────── iso2god ──
    [1]  🎮  Converter ISO para GOD
    [2]  🔍  Analisar ISO sem converter
-  ── Os dois consoles ─── extract-xiso (lê, não cria) ──
+  ── Os dois consoles ──────────────── extract-xiso-pt ──
    [3]  📦  Extrair conteúdo de ISO
    [4]  📋  Listar arquivos dentro do ISO
-  ── Xbox clássico ─────────────────────── extract-xiso ──
    [5]  🛠️  Criar ISO a partir de uma pasta
    [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
   ── Geral ─────────────────────────────────────────────
    [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
    [8]  🚀  Lote: processar uma pasta inteira
@@ -134,10 +137,11 @@ pasta de destino.
 |---|---|---|
 | **1 GOD** | iso2god | Converte ISO de Xbox 360 para Games on Demand. Threads e padding configuráveis. |
 | **2 Analisar** | iso2god | Mostra plataforma, Title ID, Media ID e título, sem converter. |
-| **3 Extrair** | extract-xiso | Extrai todo o conteúdo do ISO para uma pasta. |
-| **4 Listar** | extract-xiso | Mostra os arquivos de dentro do ISO sem extrair nada. |
-| **5 Criar** | extract-xiso | Monta um ISO novo a partir de uma pasta com os arquivos do jogo. Aceita várias pastas na mesma execução. |
-| **6 Reescrever** | extract-xiso | Reorganiza o ISO deixando ele otimizado e menor. |
+| **3 Extrair** | extract-xiso-pt | Extrai todo o conteúdo do ISO para uma pasta. Se a pasta já tiver arquivos, pergunta antes. |
+| **4 Listar** | extract-xiso-pt | Mostra os arquivos de dentro do ISO sem extrair nada. |
+| **5 Criar** | extract-xiso-pt | Monta um ISO a partir da pasta de um jogo de Xbox ou de Xbox 360. Aceita várias pastas na mesma execução. Em jogo de Xbox, oferece liberar o `default.xbe` para qualquer mídia (desligado por padrão). |
+| **6 Reescrever** | extract-xiso-pt | Deixa o ISO enxuto (tira a partição de vídeo e o espaço vazio). Sem apagar, o novo fica ao lado como `nome.xiso.iso`; apagando, o original só é trocado depois que o novo foi gravado e conferido. |
+| **v Verificar** | extract-xiso-pt | Confere a estrutura, lê o ISO inteiro e mostra CRC32, MD5 e SHA-1. Com um `.dat` do Redump, diz se é a imagem original do disco. |
 | **7 Assistente** | ambas | Lê a assinatura do ISO, diz de qual console é e mostra só as ações que fazem sentido. A recomendada vem marcada com ⭐ e ENTER aceita ela direto. |
 | **8 Lote** | ambas | Varre uma pasta inteira, separa os ISOs por console e oferece a ação certa para cada grupo. |
 | **9 Manual** | ambas | Passa argumentos direto pro binário, como no terminal. |
@@ -226,7 +230,7 @@ Tudo fica junto, na própria pasta da ferramenta:
 ```
 ~/Ferramentas/xiso-manager/
 ├── xiso_manager.py           o programa
-├── extract-xiso              binário Xbox
+├── extract-xiso-pt           ISOs de Xbox e Xbox 360
 ├── config.json               idioma, caminhos, threads, pasta padrão
 ├── xiso-manager.log          log de todas as execuções
 └── xiso-manager.log.old      log anterior (rotaciona a cada 1 MiB)
@@ -278,26 +282,22 @@ O programa respeita `NO_COLOR` e desliga sozinho quando a saída não é um term
 
 ## Requisitos
 
-Python 3.8+, `extract-xiso` e `iso2god`. Nenhuma biblioteca externa.
+Python 3.8+, `extract-xiso-pt` e `iso2god`. Nenhuma biblioteca externa.
 
 ---
 
 ## Créditos
 
+- **extract-xiso-pt** e **iso2god em Rust (português)** — de lux-insider, o
+  mesmo autor do xiso-manager.
 - **[extract-xiso](https://github.com/XboxDev/extract-xiso)** — escrito
-  originalmente por *in* (in@fishtank.com) e mantido hoje pela comunidade
-  XboxDev. É ele quem extrai, lista, cria e reescreve os ISOs; o xiso-manager
-  só dá a interface. O binário da release é o build oficial deles, sem
-  modificação, redistribuído sob a licença BSD modificada do projeto
-  (`extract-xiso-LICENSE.TXT`), Copyright (c) 2003 in <in@fishtank.com>.
-
-  *This product includes software developed by in <in@fishtank.com>.*
-- **iso2god em Rust (português)** — de lux-insider, o mesmo autor do
-  xiso-manager.
+  originalmente por *in* (in@fishtank.com) e mantido pela comunidade XboxDev.
+  As versões até a 3.1.1 do xiso-manager usavam e distribuíam o build oficial
+  dele; a partir da 3.2.0 o padrão é o extract-xiso-pt, e o oficial continua
+  aceito se você configurar o caminho.
 
 ---
 
 ## Licença
 
-MIT — veja [LICENSE](LICENSE). Vale para o código do xiso-manager; o
-extract-xiso segue a licença própria dele (`extract-xiso-LICENSE.TXT`).
+MIT — veja [LICENSE](LICENSE).
