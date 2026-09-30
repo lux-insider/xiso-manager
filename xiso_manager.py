@@ -1729,6 +1729,9 @@ def _linhas_verificado(evento):
         situacao = dat.get("situacao")
         if situacao == "confere":
             linhas.append("ORIGINAL: idêntica ao Redump — %s" % dat.get("jogo", "?"))
+        elif situacao == "enxuta":
+            linhas.append("cópia enxuta de %s: íntegra, mas o Redump guarda o hash do "
+                          "disco completo, então não tem como conferir" % dat.get("jogo", "?"))
         elif situacao == "nao_confere":
             linhas.append("NÃO CONFERE: o Redump tem %s com outro SHA-1 "
                           "(modificada, corrompida ou outra versão)" % dat.get("rom", "?"))
