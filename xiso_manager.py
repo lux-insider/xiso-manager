@@ -153,7 +153,8 @@ def _validar_config(chave, valor):
     if chave == "cor":
         return bool(valor) if isinstance(valor, bool) else padrao
     if chave in ("bin_extract_xiso", "bin_iso2god", "pasta_padrao"):
-        return valor if isinstance(valor, str) else padrao
+        # um caractere nulo é JSON válido, mas nenhum caminho o aceita
+        return valor if isinstance(valor, str) and "\x00" not in valor else padrao
     return valor if isinstance(valor, type(padrao)) else padrao
 
 
