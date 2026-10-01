@@ -41,7 +41,7 @@ Depois `source ~/.bashrc` uma vez. Daí em diante é só `xiso`.
 
 ### Windows
 
-Baixe o `xiso-manager-3.2.4-windows-x64.zip` da página de
+Baixe o `xiso-manager-3.2.5-windows-x64.zip` da página de
 [Releases](https://github.com/lux-insider/xiso-manager/releases), descompacte a
 pasta inteira e dê dois cliques em **`xiso-manager.exe`**. Roda no Windows 10/11
 (64 bits) sem instalar nada: a pasta já traz tudo.
@@ -98,7 +98,7 @@ Se o binário existir mas não for executável, ele tenta o `chmod +x` sozinho.
 
 ```
 ╭────────────────────────────────────────────────────╮
-│ 💿  xiso-manager  ·  v3.2.4                        │
+│ 💿  xiso-manager  ·  v3.2.5                        │
 ╰────────────────────────────────────────────────────╯
 
   ✓ extract-xiso-pt pronto
