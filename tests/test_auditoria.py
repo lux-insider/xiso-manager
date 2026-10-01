@@ -100,5 +100,64 @@ class R2OficialComDestinoEmOutraPasta(Base):
         self.assertIn("O ISO original ficou em %s.old" % self.iso, saida)
 
 
+LENTO = {"XMF_PASSOS": "400", "XMF_PAUSA": "0.05"}
+
+
+def interromper(amb, processo, sinal, grupo=True, espera=0.3):
+    """Manda o sinal quando a ferramenta já está no meio do trabalho: ao
+    grupo (Ctrl+C, terminal fechado) ou só ao menu (SIGTERM)."""
+    filho = amb.esperar_ferramenta()[0]
+    time.sleep(espera)
+    (os.killpg if grupo else os.kill)(processo.pid, sinal)
+    return filho
+
+
+def terminar(processo, prazo=40):
+    try:
+        saida, erros = processo.communicate(timeout=prazo)
+    except Exception:
+        os.killpg(processo.pid, signal.SIGKILL)
+        saida, erros = processo.communicate()
+        raise AssertionError("o menu não terminou em %ss" % prazo)
+    return processo.returncode, sem_cor(saida.decode("utf-8", "replace"))
+
+
+class R3OficialInterrompido(Base):
+    """R-3: o extract-xiso oficial morre no Ctrl+C e deixa o arquivo novo
+    pela metade com o nome do original (que ficou como .old). Antes, o menu
+    não desfazia nada, porque "existe um arquivo com o nome do original"."""
+
+    oficial = True
+
+    def ctrl_c(self, destino=""):
+        respostas = ["6", "c", str(self.iso), destino, "", "", "", "", "", "0"]
+        processo = self.amb.iniciar(respostas, env=LENTO)
+        interromper(self.amb, processo, signal.SIGINT)
+        codigo, saida = terminar(processo)
+        self.assertEqual(codigo, 0)
+        return saida
+
+    def test_mesma_pasta(self):
+        saida = self.ctrl_c()
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
+        self.assertIn("o ISO original voltou ao nome de antes", saida)
+
+    def test_outra_pasta(self):
+        destino = self.amb.dir / "otimizados"
+        saida = self.ctrl_c(str(destino))
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
+        self.assertEqual(self.arquivos(destino), {}, "a sobra pela metade sai do destino")
+        self.assertIn("o ISO original voltou ao nome de antes", saida)
+
+    def test_old_que_ja_existia_nao_e_mexido(self):
+        """Com um .old de antes, o oficial se recusa e o menu não toca em nada."""
+        outro = self.amb.iso("Halo.iso.old", b"OUTRO ARQUIVO", pasta=self.jogos)
+        codigo, saida, _ = self.amb.rodar(["6", "c", str(self.iso), "", "", "", "", "", "", "0"],
+                                          env={"XMF_FALHAR": "1"})
+        self.assertEqual(self.arquivos(self.jogos),
+                         {"Halo.iso": "ORIGINAL", "Halo.iso.old": "13 bytes"})
+        self.assertEqual(outro.read_bytes(), b"OUTRO ARQUIVO")
+
+
 if __name__ == "__main__":
     unittest.main()
