@@ -1,0 +1,127 @@
+
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💿  xiso-manager  ·  v3.2.5                                    │
+╰────────────────────────────────────────────────────────────────╯
+
+  ● iso2god         pronto
+  ● extract-xiso-pt pronto
+
+──────────────────────────────────────────────────────────────────
+
+  ── Xbox 360 ───────────────────────────────────────── iso2god ──
+   [1]  🎮  Converter ISO para GOD
+   [2]  🔍  Analisar ISO sem converter
+
+  ── Os dois consoles ───────────────────────── extract-xiso-pt ──
+   [3]  📦  Extrair conteúdo de ISO
+   [4]  📋  Listar arquivos dentro do ISO
+   [5]  🛠️  Criar ISO a partir de uma pasta
+   [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
+
+  ── Geral ───────────────────────────────────────────────────────
+   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
+   [8]  🚀  Lote: processar uma pasta inteira
+   [9]  ⌨️  Comando manual (avançado)
+
+  ── Sistema ─────────────────────────────────────────────────────
+   [c]  ⚙️  Configurações
+   [l]  🧾  Ver log de execução
+   [s]  📖  Sobre / ajuda
+
+   [0]  🚪  Sair
+
+──────────────────────────────────────────────────────────────────
+
+  ▸ Escolha uma opção:
+
+╭────────────────────────────────────────────────────────────────╮
+│ 📋  Listar arquivos dentro do ISO                              │
+╰────────────────────────────────────────────────────────────────╯
+
+  Mostra os arquivos de dentro do ISO sem extrair nada.
+
+
+╭────────────────────────────────────────────────────────────────╮
+│ 📁  SELECIONAR ARQUIVO                                         │
+╰────────────────────────────────────────────────────────────────╯
+
+  📁 Pasta atual   <BASE>/jogos
+
+  #  ARQUIVO                TAMANHO  CONSOLE
+  ──────────────────────────────────────────
+  1  📄  Halo.iso          0.05 MiB  ?
+  2  📄  Jogo de Ação.iso  0.01 MiB  ?
+
+  [..]  ⬆️  Subir um nível
+   [c]  ⌨️  Digitar um caminho
+   [t]  🚀  Selecionar TODOS os ISOs desta pasta
+   [0]  🚪  Voltar
+
+  Números separados por vírgula (ex: 1,3,5) ou intervalo (1-4)
+
+  ▸ Escolha uma opção:
+  ── 1/2 · Seleção ───────────────────────────────────────────────
+  #  ARQUIVO                TAMANHO  CONSOLE
+  ──────────────────────────────────────────
+  1  📄  Jogo de Ação.iso  0.01 MiB  ?
+
+  📊 total         1 arquivo(s) selecionado(s)  0.01 MiB
+
+  ── 2/2 · Resultado ─────────────────────────────────────────────
+    ├ arquivo0.bin
+    ├ arquivo1.bin
+    ├ arquivo2.bin
+    └ arquivo3.bin
+  ✓  Lendo conteúdo   concluído em <T>
+
+╭────────────────────────────────────────────────────────────────╮
+│ ✅  RESUMO — Listar arquivos dentro do ISO                     │
+╰────────────────────────────────────────────────────────────────╯
+
+  ✓  Sucesso          1
+  ✓  Falhas           0
+  ⏱️ Tempo            <T>
+
+  Log completo em: <BASE>/app/xiso-manager.log
+
+  ▸ Pressione ENTER para continuar
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💿  xiso-manager  ·  v3.2.5                                    │
+╰────────────────────────────────────────────────────────────────╯
+
+  ● iso2god         pronto
+  ● extract-xiso-pt pronto
+
+──────────────────────────────────────────────────────────────────
+
+  ── Xbox 360 ───────────────────────────────────────── iso2god ──
+   [1]  🎮  Converter ISO para GOD
+   [2]  🔍  Analisar ISO sem converter
+
+  ── Os dois consoles ───────────────────────── extract-xiso-pt ──
+   [3]  📦  Extrair conteúdo de ISO
+   [4]  📋  Listar arquivos dentro do ISO
+   [5]  🛠️  Criar ISO a partir de uma pasta
+   [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
+
+  ── Geral ───────────────────────────────────────────────────────
+   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
+   [8]  🚀  Lote: processar uma pasta inteira
+   [9]  ⌨️  Comando manual (avançado)
+
+  ── Sistema ─────────────────────────────────────────────────────
+   [c]  ⚙️  Configurações
+   [l]  🧾  Ver log de execução
+   [s]  📖  Sobre / ajuda
+
+   [0]  🚪  Sair
+
+──────────────────────────────────────────────────────────────────
+
+  ▸ Escolha uma opção:
+  🚪  Até logo! Valeu por usar o XISO Manager.
+

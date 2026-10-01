@@ -1,0 +1,143 @@
+
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💿  xiso-manager  ·  v3.2.5                                    │
+╰────────────────────────────────────────────────────────────────╯
+
+  ● iso2god         pronto
+  ● extract-xiso-pt pronto
+
+──────────────────────────────────────────────────────────────────
+
+  ── Xbox 360 ───────────────────────────────────────── iso2god ──
+   [1]  🎮  Converter ISO para GOD
+   [2]  🔍  Analisar ISO sem converter
+
+  ── Os dois consoles ───────────────────────── extract-xiso-pt ──
+   [3]  📦  Extrair conteúdo de ISO
+   [4]  📋  Listar arquivos dentro do ISO
+   [5]  🛠️  Criar ISO a partir de uma pasta
+   [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
+
+  ── Geral ───────────────────────────────────────────────────────
+   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
+   [8]  🚀  Lote: processar uma pasta inteira
+   [9]  ⌨️  Comando manual (avançado)
+
+  ── Sistema ─────────────────────────────────────────────────────
+   [c]  ⚙️  Configurações
+   [l]  🧾  Ver log de execução
+   [s]  📖  Sobre / ajuda
+
+   [0]  🚪  Sair
+
+──────────────────────────────────────────────────────────────────
+
+  ▸ Escolha uma opção:
+
+╭────────────────────────────────────────────────────────────────╮
+│ 🎮  Converter ISO para GOD                                     │
+╰────────────────────────────────────────────────────────────────╯
+
+  Converte um ISO de Xbox 360 para o formato GOD (Games on Demand).
+
+
+╭────────────────────────────────────────────────────────────────╮
+│ 📁  SELECIONAR ARQUIVO                                         │
+╰────────────────────────────────────────────────────────────────╯
+
+  📁 Pasta atual   <BASE>/jogos
+
+  #  ARQUIVO                TAMANHO  CONSOLE
+  ──────────────────────────────────────────
+  1  📄  Halo.iso          0.05 MiB  ?
+  2  📄  Jogo de Ação.iso  0.01 MiB  ?
+
+  [..]  ⬆️  Subir um nível
+   [c]  ⌨️  Digitar um caminho
+   [t]  🚀  Selecionar TODOS os ISOs desta pasta
+   [0]  🚪  Voltar
+
+  Números separados por vírgula (ex: 1,3,5) ou intervalo (1-4)
+
+  ▸ Escolha uma opção:
+  ── 1/4 · Seleção ───────────────────────────────────────────────
+  #  ARQUIVO        TAMANHO  CONSOLE
+  ──────────────────────────────────
+  1  📄  Halo.iso  0.05 MiB  ?
+
+  📊 total         1 arquivo(s) selecionado(s)  0.05 MiB
+
+  ── 2/4 · Destino ───────────────────────────────────────────────
+
+  ▸ Pasta de destino:     └ <BASE>/GOD
+
+  ── 3/4 · Opções ────────────────────────────────────────────────
+
+  ▸ Título do jogo (ENTER = detectar automaticamente):
+  ▸ Número de threads [4]:
+  ▸ Cortar espaço não usado do fim do ISO? [S/n]:
+  ── 4/4 · Verificação ───────────────────────────────────────────
+  📁 Destino       <BASE>
+  📦 Necessário    0.05 MiB  (com margem: 0.06 MiB)
+  💾 Disponível    ##.## GiB   Total: ###.## GiB
+  📊 Uso atual     <BARRA> ##.#%
+  ✓  Espaço suficiente.
+
+  ▸ Confirmar? [S/n]:
+  ── Execução ────────────────────────────────────────────────────
+    ├ Convertendo <BASE>/jogos/Halo.iso -> <BASE>…
+    ├ Convertendo ISO para GOD...
+    └ erro: não foi possível ler <BASE>/jogos/Halo.iso: …
+  ✗  Convertendo para GOD O programa terminou com código de erro 1
+
+╭────────────────────────────────────────────────────────────────╮
+│ ❌  RESUMO — Converter ISO para GOD                            │
+╰────────────────────────────────────────────────────────────────╯
+
+  ·  Sucesso          0
+  ✗  Falhas           1
+  ⏱️ Tempo            <T>
+
+  Log completo em: <BASE>/app/xiso-manager.log
+
+  ▸ Pressione ENTER para continuar
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💿  xiso-manager  ·  v3.2.5                                    │
+╰────────────────────────────────────────────────────────────────╯
+
+  ● iso2god         pronto
+  ● extract-xiso-pt pronto
+
+──────────────────────────────────────────────────────────────────
+
+  ── Xbox 360 ───────────────────────────────────────── iso2god ──
+   [1]  🎮  Converter ISO para GOD
+   [2]  🔍  Analisar ISO sem converter
+
+  ── Os dois consoles ───────────────────────── extract-xiso-pt ──
+   [3]  📦  Extrair conteúdo de ISO
+   [4]  📋  Listar arquivos dentro do ISO
+   [5]  🛠️  Criar ISO a partir de uma pasta
+   [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
+
+  ── Geral ───────────────────────────────────────────────────────
+   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
+   [8]  🚀  Lote: processar uma pasta inteira
+   [9]  ⌨️  Comando manual (avançado)
+
+  ── Sistema ─────────────────────────────────────────────────────
+   [c]  ⚙️  Configurações
+   [l]  🧾  Ver log de execução
+   [s]  📖  Sobre / ajuda
+
+   [0]  🚪  Sair
+
+──────────────────────────────────────────────────────────────────
+
+  ▸ Escolha uma opção:
+  🚪  Até logo! Valeu por usar o XISO Manager.
+

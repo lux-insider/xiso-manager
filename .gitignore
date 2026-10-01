@@ -10,3 +10,4 @@ extract-xiso
 extract-xiso-pt*
 iso2god*
 /windows/lancador/target/
+tests/__pycache__/
