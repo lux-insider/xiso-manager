@@ -18,6 +18,7 @@ import os
 import re
 import sys
 import json
+import codecs
 import time
 import shutil
 import logging
@@ -1984,6 +1985,9 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
         # crescia sem limite e varrido desde o começo: uma linha de 32 MiB
         # sem quebra levava 8 minutos e 400 MiB de memória.
         pendente, guardado = [], 0
+        # Um caractere UTF-8 pode vir partido entre duas leituras: o
+        # decodificador incremental guarda o começo dele para a próxima.
+        decodificar = codecs.getincrementaldecoder("utf-8")("replace").decode
         while True:
             try:
                 pedaco = os.read(processo.stdout.fileno(), 4096)
@@ -1991,7 +1995,7 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
                 break
             if not pedaco:
                 break
-            texto = pedaco.decode("utf-8", "replace")
+            texto = decodificar(pedaco)
             inicio = 0
             for marca in RE_QUEBRA.finditer(texto):
                 if guardado < LIMITE_LINHA:
@@ -2006,7 +2010,7 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
                 pendente.append(trecho)
                 guardado += len(trecho)
 
-        resto = _limpar_linha_externa("".join(pendente))
+        resto = _limpar_linha_externa("".join(pendente) + decodificar(b"", True))
         if resto:
             resultado.saida.append(resto)
             resultado.total_linhas += 1

@@ -324,6 +324,39 @@ class L2LinhaEnorme(Base):
         self.assertLess(pico_mib, 120, "pico de %d MiB" % pico_mib)
 
 
+def executar_aqui(teste, cmd, env=None, **kw):
+    """Roda `executar` do menu neste processo (sem tela) e devolve o
+    Resultado e o que ele imprimiu."""
+    import contextlib
+    import io
+    xm = carregar_modulo(teste.amb)
+    variaveis = dict(env or {}, XMF_PIDS=str(teste.amb.pids), XMF_REGISTRO=str(teste.amb.registro))
+    antes = {k: os.environ.get(k) for k in variaveis}
+    os.environ.update(variaveis)
+    try:
+        tela = io.StringIO()
+        with contextlib.redirect_stdout(tela):
+            r = xm.executar(cmd, "Teste", **kw)
+    finally:
+        for k, v in antes.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    return r, sem_cor(tela.getvalue())
+
+
+class L3AcentoPartido(Base):
+    """L-3: um "ç" (2 bytes) na divisa de duas leituras de 4 KiB. Antes, cada
+    pedaço era decodificado sozinho e o caractere virava "��"."""
+
+    def test_acento_inteiro(self):
+        r, _ = executar_aqui(self, [str(self.amb.bin / "extract-xiso-pt"), "listar", "x.iso"],
+                             {"XMF_SAIDA": "utf8_partido", "XMF_PASSOS": "0"})
+        linhas = [l for l in r.saida if l.endswith("fim")]
+        self.assertEqual(linhas, ["a" * 4095 + "çé fim"])
+
+
 # ── 4. Configuração e entrada ───────────────────────────────────────────────
 
 def esperar_texto(processo, texto, prazo=15):
