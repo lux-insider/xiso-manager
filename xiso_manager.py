@@ -66,7 +66,7 @@ EXIT_ERRO = 1
 EXIT_INTERROMPIDO = 130
 
 APP_NOME = "xiso-manager"
-APP_VERSAO = "3.2.3"
+APP_VERSAO = "3.2.4"
 
 
 def _pasta_base():
