@@ -293,6 +293,37 @@ class L1EventoComTipoErrado(Base):
         self.assertIn("limpou", self.amb.registro_texto())
 
 
+class L2LinhaEnorme(Base):
+    """L-2: uma linha de 32 MiB sem quebra. Antes, 505 s e 407 MiB: cada
+    pedaço lido era somado ao texto acumulado e varrido desde o começo."""
+
+    def test_rapido_e_com_memoria_limitada(self):
+        import subprocess
+        medidor = ("import resource, subprocess, sys; "
+                   "p = subprocess.run([sys.executable, sys.argv[1]], input=sys.argv[2].encode(), "
+                   "stdout=subprocess.PIPE, stderr=subprocess.DEVNULL); "
+                   "sys.stdout.buffer.write(p.stdout); "
+                   "print('\\nPICO=%d' % resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss)")
+        env = dict(self.amb.env, XMF_SAIDA="linha_enorme", XMF_MIB="32", XMF_PASSOS="0")
+        inicio = time.time()
+        processo = subprocess.Popen(
+            [sys.executable, "-c", medidor, str(self.amb.app / "xiso_manager.py"),
+             "4\nc\n%s\n\n0\n" % self.iso], env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, start_new_session=True)
+        try:
+            saida, _ = processo.communicate(timeout=60)
+        except subprocess.TimeoutExpired:
+            os.killpg(processo.pid, signal.SIGKILL)
+            processo.communicate()
+            self.fail("o menu não terminou em 60 s")
+        duracao = time.time() - inicio
+        saida = saida.decode("utf-8", "replace")
+        pico_mib = int(saida.rsplit("PICO=", 1)[1]) // 1024
+        self.assertIn("fim da linha enorme", saida)
+        self.assertLess(duracao, 30, "levou %.0f s" % duracao)
+        self.assertLess(pico_mib, 120, "pico de %d MiB" % pico_mib)
+
+
 # ── 4. Configuração e entrada ───────────────────────────────────────────────
 
 def esperar_texto(processo, texto, prazo=15):

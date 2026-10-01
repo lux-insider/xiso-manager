@@ -1808,6 +1808,10 @@ class Resultado:
 
 
 RE_PERCENTUAL = re.compile(r"(\d{1,3})\s?%")
+RE_QUEBRA = re.compile(r"[\r\n]")
+# Uma linha de saída maior que isto é cortada: a tela mostra 58 colunas e
+# os eventos JSON têm poucas centenas de bytes.
+LIMITE_LINHA = 256 * 1024
 
 # O extract-xiso anima o próprio progresso com \b, e outras ferramentas
 # emitem cor. Cru, isso vaza como lixo na nossa tabela.
@@ -1940,7 +1944,46 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
         processo = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, bufsize=0)
         _ferramenta = processo
-        buffer = ""
+
+        def tratar(linha):
+            # iso2god próprio com --progresso-json: uma linha JSON por
+            # evento. O progresso vira a barra; o resto, texto legível.
+            evento = _evento_json(linha)
+            if evento is not None:
+                if evento.get("evento") == "verificado":
+                    for l in _linhas_verificado(evento):
+                        resultado.saida.append(l)
+                        resultado.total_linhas += 1
+                    return
+                if evento.get("evento") == "progresso":
+                    total_bytes = _numero(evento.get("total_bytes")) or 0
+                    feito = _numero(evento.get("bytes", 0)) or 0
+                    if total_bytes > 0:
+                        fiscal.definir_percentual(
+                            max(0.0, min(1.0, feito / total_bytes)))
+                    return
+                linha = _texto_evento(evento)
+                if not linha:
+                    return
+            # ferramentas que usam \r repetem a mesma linha várias vezes
+            if resultado.saida and resultado.saida[-1] == linha:
+                return
+            resultado.saida.append(linha)
+            resultado.total_linhas += 1
+            achou = RE_PERCENTUAL.search(linha)
+            if achou:
+                try:
+                    fiscal.definir_percentual(min(1.0, int(achou.group(1)) / 100.0))
+                except ValueError:
+                    pass
+            else:
+                fiscal.definir_detalhe(os.path.basename(linha)[:20])
+
+        # A linha em montagem fica em pedaços, e a quebra é procurada só no
+        # pedaço novo. Antes, cada pedaço de 4 KiB era somado a um texto que
+        # crescia sem limite e varrido desde o começo: uma linha de 32 MiB
+        # sem quebra levava 8 minutos e 400 MiB de memória.
+        pendente, guardado = [], 0
         while True:
             try:
                 pedaco = os.read(processo.stdout.fileno(), 4096)
@@ -1948,49 +1991,22 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
                 break
             if not pedaco:
                 break
-            buffer += pedaco.decode("utf-8", "replace")
-            while True:
-                marca = re.search(r"[\r\n]", buffer)
-                if not marca:
-                    break
-                linha = _limpar_linha_externa(buffer[:marca.start()])
-                buffer = buffer[marca.end():]
-                if not linha:
-                    continue
-                # iso2god próprio com --progresso-json: uma linha JSON por
-                # evento. O progresso vira a barra; o resto, texto legível.
-                evento = _evento_json(linha)
-                if evento is not None:
-                    if evento.get("evento") == "verificado":
-                        for l in _linhas_verificado(evento):
-                            resultado.saida.append(l)
-                            resultado.total_linhas += 1
-                        continue
-                    if evento.get("evento") == "progresso":
-                        total_bytes = _numero(evento.get("total_bytes")) or 0
-                        feito = _numero(evento.get("bytes", 0)) or 0
-                        if total_bytes > 0:
-                            fiscal.definir_percentual(
-                                max(0.0, min(1.0, feito / total_bytes)))
-                        continue
-                    linha = _texto_evento(evento)
-                    if not linha:
-                        continue
-                # ferramentas que usam \r repetem a mesma linha várias vezes
-                if resultado.saida and resultado.saida[-1] == linha:
-                    continue
-                resultado.saida.append(linha)
-                resultado.total_linhas += 1
-                achou = RE_PERCENTUAL.search(linha)
-                if achou:
-                    try:
-                        fiscal.definir_percentual(min(1.0, int(achou.group(1)) / 100.0))
-                    except ValueError:
-                        pass
-                else:
-                    fiscal.definir_detalhe(os.path.basename(linha)[:20])
+            texto = pedaco.decode("utf-8", "replace")
+            inicio = 0
+            for marca in RE_QUEBRA.finditer(texto):
+                if guardado < LIMITE_LINHA:
+                    pendente.append(texto[inicio:marca.start()][:LIMITE_LINHA - guardado])
+                linha = _limpar_linha_externa("".join(pendente))
+                pendente, guardado = [], 0
+                inicio = marca.end()
+                if linha:
+                    tratar(linha)
+            if guardado < LIMITE_LINHA:
+                trecho = texto[inicio:][:LIMITE_LINHA - guardado]
+                pendente.append(trecho)
+                guardado += len(trecho)
 
-        resto = _limpar_linha_externa(buffer)
+        resto = _limpar_linha_externa("".join(pendente))
         if resto:
             resultado.saida.append(resto)
             resultado.total_linhas += 1
