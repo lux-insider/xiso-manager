@@ -178,12 +178,30 @@ def carregar_config():
 
 
 def salvar_config():
+    # Grava num temporário ao lado e troca de uma vez: regravar no lugar
+    # trunca o arquivo antes, e uma queda no meio o deixava pela metade. Se
+    # o config.json for um link, o arquivo trocado é o de verdade.
+    temporario = None
     try:
         DIR_BASE.mkdir(parents=True, exist_ok=True)
-        with open(ARQ_CONFIG, "w", encoding="utf-8") as f:
+        destino = os.path.realpath(ARQ_CONFIG)
+        temporario = destino + ".tmp"
+        with open(temporario, "w", encoding="utf-8") as f:
             json.dump(_config, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        try:
+            shutil.copymode(destino, temporario)
+        except OSError:
+            pass
+        os.replace(temporario, destino)
         return True
     except Exception as e:
+        if temporario:
+            try:
+                os.remove(temporario)
+            except OSError:
+                pass
         log_evento("erro", f"Falha ao salvar config: {e}")
         return False
 

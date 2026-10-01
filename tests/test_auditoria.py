@@ -536,6 +536,46 @@ def esperar_texto(processo, texto, prazo=15):
     raise AssertionError("o menu não chegou em %r" % texto)
 
 
+class C1ConfigRegravadoNoLugar(Base):
+    """C-1: o config.json era truncado e regravado no lugar; morrer no meio
+    da gravação (queda de energia, SIGKILL) o deixava pela metade, e as
+    configurações voltavam ao padrão."""
+
+    def salvar_e_morrer_no_meio(self):
+        """Um menu que muda o idioma e morre no meio da gravação."""
+        codigo = (
+            "import importlib.util, json, os, sys\n"
+            "spec = importlib.util.spec_from_file_location('xm', sys.argv[1])\n"
+            "xm = importlib.util.module_from_spec(spec); spec.loader.exec_module(xm)\n"
+            "xm.carregar_config()\n"
+            "def dump(dados, f, **kw):\n"
+            "    f.write(json.dumps(dados, **kw)[:20]); f.flush(); os._exit(9)\n"
+            "xm.json.dump = dump\n"
+            "xm.set_cfg('idioma', 'en')\n")
+        r = __import__("subprocess").run(
+            [sys.executable, "-c", codigo, str(self.amb.app / "xiso_manager.py")],
+            env=self.amb.env, capture_output=True, timeout=60)
+        self.assertEqual(r.returncode, 9, r.stderr)
+
+    def test_morrer_no_meio_mantem_o_config(self):
+        self.amb.config(idioma="pt", threads_god=7)
+        antes = (self.amb.app / "config.json").read_text(encoding="utf-8")
+        self.salvar_e_morrer_no_meio()
+        self.assertEqual((self.amb.app / "config.json").read_text(encoding="utf-8"), antes)
+
+    def test_formato_e_link_continuam(self):
+        guardado = self.amb.dir / "guardado.json"
+        (self.amb.app / "config.json").rename(guardado)
+        (self.amb.app / "config.json").symlink_to(guardado)
+        xm = carregar_modulo(self.amb)
+        xm.set_cfg("threads_god", 9)
+        self.assertTrue((self.amb.app / "config.json").is_symlink())
+        self.assertEqual(guardado.read_text(encoding="utf-8"),
+                         __import__("json").dumps(xm._config, indent=2, ensure_ascii=False))
+        self.assertEqual(sorted(p.name for p in self.amb.app.iterdir() if p.name != "__pycache__"),
+                         ["config.json", "xiso-manager.log", "xiso_manager.py"])
+
+
 class E1CtrlCNaConfirmacao(Base):
     """E-1: Ctrl+C em "Confirmar? [S/n]" valia a resposta padrão, "sim": a
     operação começava. Agora vale "não"."""
