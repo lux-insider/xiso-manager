@@ -2092,13 +2092,19 @@ def perguntar(texto, obrigatorio=True, padrao=None):
         aviso(t("obrigatorio"))
 
 
-def perguntar_sim_nao(texto, padrao_sim=False):
+def perguntar_sim_nao(texto, padrao_sim=False, no_ctrl_c=None):
+    """Pergunta de sim/não. `no_ctrl_c` é a resposta quando o usuário aperta
+    Ctrl+C (por padrão, a mesma do ENTER). Nas confirmações vale "não":
+    quem aperta Ctrl+C quer desistir, e o padrão "sim" começava a operação."""
     sufixo = t("sim_nao_s") if padrao_sim else t("sim_nao_n")
     try:
         resp = _ler(prompt(f"{cor(texto, C.BRANC)} {cor('[' + sufixo + ']', C.CINZA)}")).strip().lower()
-    except (EOFError, KeyboardInterrupt):
+    except EOFError:
         print()
         return padrao_sim
+    except KeyboardInterrupt:
+        print()
+        return padrao_sim if no_ctrl_c is None else no_ctrl_c
     if not resp:
         return padrao_sim
     return resp in ("s", "sim", "y", "yes", "1")
@@ -2463,7 +2469,7 @@ def acao_extrair(arquivos=None):
     if destino and not preparar_destino(destino):
         pausar()
         return
-    if not perguntar_sim_nao(t("confirmar"), padrao_sim=True):
+    if not perguntar_sim_nao(t("confirmar"), padrao_sim=True, no_ctrl_c=False):
         aviso(t("cancelado"))
         pausar()
         return
@@ -2628,7 +2634,7 @@ def acao_criar():
     if not verificar_espaco(destino_check, total):
         pausar()
         return
-    if not perguntar_sim_nao(t("confirmar"), padrao_sim=True):
+    if not perguntar_sim_nao(t("confirmar"), padrao_sim=True, no_ctrl_c=False):
         aviso(t("cancelado"))
         pausar()
         return
@@ -2754,7 +2760,7 @@ def acao_reescrever(arquivos=None):
     apagar = perguntar_sim_nao(t("p_apagar_antigo"), padrao_sim=False)
     if apagar:
         aviso(t("p_apagar_certeza"))
-        if not perguntar_sim_nao(t("confirmar"), padrao_sim=False):
+        if not perguntar_sim_nao(t("confirmar"), padrao_sim=False, no_ctrl_c=False):
             apagar = False
             print(resposta(t("cancelado")))
     sem_patch = liberar = False
@@ -2775,7 +2781,7 @@ def acao_reescrever(arquivos=None):
     if destino and not preparar_destino(destino):
         pausar()
         return
-    if not perguntar_sim_nao(t("confirmar"), padrao_sim=True):
+    if not perguntar_sim_nao(t("confirmar"), padrao_sim=True, no_ctrl_c=False):
         aviso(t("cancelado"))
         pausar()
         return
@@ -3063,7 +3069,7 @@ def acao_god(arquivos=None):
     if not preparar_destino(destino):
         pausar()
         return
-    if not perguntar_sim_nao(t("confirmar"), padrao_sim=True):
+    if not perguntar_sim_nao(t("confirmar"), padrao_sim=True, no_ctrl_c=False):
         aviso(t("cancelado"))
         pausar()
         return

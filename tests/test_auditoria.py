@@ -293,5 +293,42 @@ class L1EventoComTipoErrado(Base):
         self.assertIn("limpou", self.amb.registro_texto())
 
 
+# ── 4. Configuração e entrada ───────────────────────────────────────────────
+
+def esperar_texto(processo, texto, prazo=15):
+    """Lê a saída do menu até aparecer `texto` (a pergunta em que ele parou)."""
+    import select
+    lido = b""
+    limite = time.time() + prazo
+    while time.time() < limite:
+        prontos, _, _ = select.select([processo.stdout], [], [], 0.1)
+        if prontos:
+            pedaco = os.read(processo.stdout.fileno(), 65536)
+            if not pedaco:
+                break
+            lido += pedaco
+            if texto in sem_cor(lido.decode("utf-8", "replace")):
+                return lido
+    raise AssertionError("o menu não chegou em %r" % texto)
+
+
+class E1CtrlCNaConfirmacao(Base):
+    """E-1: Ctrl+C em "Confirmar? [S/n]" valia a resposta padrão, "sim": a
+    operação começava. Agora vale "não"."""
+
+    def test_ctrl_c_na_confirmacao_cancela(self):
+        destino = self.amb.dir / "GOD"
+        processo = self.amb.iniciar(["1", "c", str(self.iso), str(destino), "", "", ""])
+        esperar_texto(processo, "Confirmar? [S/n]")
+        time.sleep(0.2)
+        os.killpg(processo.pid, signal.SIGINT)
+        processo.stdin.write(b"\n0\n")
+        processo.stdin.flush()
+        codigo, saida = terminar(processo)
+        self.assertFalse(self.amb.pids.exists(), "a conversão não pode ter começado")
+        self.assertFalse(destino.exists() and any(destino.iterdir()))
+        self.assertIn("Operação cancelada pelo usuário.", saida)
+
+
 if __name__ == "__main__":
     unittest.main()
