@@ -175,8 +175,11 @@ def posicionais():
 
 def erro_pt(mensagem):
     if "--progresso-json" in ARGS:
+        texto_antes = os.environ.get("XMF_ERRO_TEXTO_ANTES") == "1"
+        if texto_antes and ARGS[0] == "verificar":
+            escrever("X  %s\n" % mensagem, fd=2)     # console antigo do Windows
         evento(evento="erro", mensagem=mensagem)
-        if ARGS[0] == "verificar":
+        if ARGS[0] == "verificar" and not texto_antes:
             escrever("\u274c %s\n" % mensagem, fd=2)
     else:
         escrever("\u274c %s\n" % mensagem, fd=2)

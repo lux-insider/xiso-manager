@@ -357,6 +357,24 @@ class L3AcentoPartido(Base):
         self.assertEqual(linhas, ["a" * 4095 + "çé fim"])
 
 
+class L4MensagemDoVerificarUmaVezSo(Base):
+    """L-4: o verificar --progresso-json manda o erro como evento JSON e como
+    texto ("❌ ..."); o menu mostrava os dois."""
+
+    MENSAGEM = "a imagem está truncada: termina no setor 1000, o volume declara 2000"
+
+    def verificar(self, env):
+        r, _ = executar_aqui(self, [str(self.amb.bin / "extract-xiso-pt"), "verificar",
+                                    str(self.iso), "--progresso-json"], dict(env, XMF_FALHAR="1"))
+        return [l for l in r.saida if self.MENSAGEM in l]
+
+    def test_evento_e_depois_texto(self):
+        self.assertEqual(self.verificar({}), ["erro: " + self.MENSAGEM])
+
+    def test_texto_e_depois_evento(self):
+        self.assertEqual(self.verificar({"XMF_ERRO_TEXTO_ANTES": "1"}), ["X " + self.MENSAGEM])
+
+
 # ── 4. Configuração e entrada ───────────────────────────────────────────────
 
 def esperar_texto(processo, texto, prazo=15):
