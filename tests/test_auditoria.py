@@ -394,6 +394,31 @@ class L4MensagemDoVerificarUmaVezSo(Base):
         self.assertEqual(self.verificar({"XMF_ERRO_TEXTO_ANTES": "1"}), ["X " + self.MENSAGEM])
 
 
+class L5InfoJsonInesperado(Base):
+    """L-5: `info --json` que não é objeto, ou com campo de tipo errado.
+    Antes, "Erro inesperado: 'list' object has no attribute 'get'" e a
+    análise das outras ISOs da seleção parava ali."""
+
+    def analisar(self, info):
+        self.amb.iso("Outro.iso", pasta=self.jogos)
+        self.amb.config(pasta_padrao=str(self.jogos))
+        codigo, saida, erros = self.amb.rodar(["2", "t", "", "0"], env={"XMF_INFO": info})
+        self.assertEqual(codigo, 0, erros)
+        return sem_cor(saida)
+
+    def test_json_que_nao_e_objeto(self):
+        saida = self.analisar("[1, 2]")
+        self.assertNotIn("has no attribute", saida)
+        self.assertRegex(saida, r"Falhas\s+2", "as duas ISOs são analisadas")
+
+    def test_campos_de_tipo_errado(self):
+        saida = self.analisar('{"tamanho_volume": "7 GB", "disco": 1, "titulo": "Jogo X",'
+                              ' "plataforma_detectada": ["xbox360"]}')
+        self.assertNotIn("inesperado", saida)
+        self.assertIn("Jogo X", saida)
+        self.assertRegex(saida, r"Sucesso\s+2")
+
+
 # ── 4. Configuração e entrada ───────────────────────────────────────────────
 
 class A1NomeQueNaoEhUtf8(Base):
