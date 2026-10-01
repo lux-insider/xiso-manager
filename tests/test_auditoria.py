@@ -159,5 +159,45 @@ class R3OficialInterrompido(Base):
         self.assertEqual(outro.read_bytes(), b"OUTRO ARQUIVO")
 
 
+# ── 2. Processos filhos ─────────────────────────────────────────────────────
+
+GOD = ["1", "c", None, None, "", "", "", "", "", "0"]
+
+
+class P1Sigterm(Base):
+    """P-1: SIGTERM só para o menu (um `kill`, o desligamento). Antes, ele
+    morria na hora e a ferramenta seguia convertendo escondida."""
+
+    def test_espera_a_ferramenta_limpar_e_sai_com_sigterm(self):
+        destino = self.amb.dir / "GOD"
+        respostas = GOD[:2] + [str(self.iso), str(destino)] + GOD[4:]
+        processo = self.amb.iniciar(respostas, env=LENTO)
+        filho = interromper(self.amb, processo, signal.SIGTERM, grupo=False)
+        codigo, saida = terminar(processo, prazo=20)
+        try:
+            self.assertEqual(codigo, -signal.SIGTERM, "sai como antes: morto por SIGTERM")
+            self.assertTrue(esperar_morrer(filho, 5), "a ferramenta não pode ficar rodando")
+            self.assertIn("limpou", self.amb.registro_texto())
+            self.assertEqual(list(destino.rglob("*")) if destino.exists() else [], [])
+        finally:
+            matar(filho)
+
+    def test_parado_numa_pergunta_sai_na_hora(self):
+        processo = self.amb.iniciar([])
+        time.sleep(0.5)
+        os.kill(processo.pid, signal.SIGTERM)
+        codigo, _ = terminar(processo, prazo=10)
+        self.assertEqual(codigo, -signal.SIGTERM)
+
+    def test_reescrita_oficial_volta_ao_nome(self):
+        self.amb.config(bin_extract_xiso=str(self.amb.bin / "extract-xiso"))
+        processo = self.amb.iniciar(["6", "c", str(self.iso), "", "", "", "", "", "", "0"],
+                                    env=LENTO)
+        interromper(self.amb, processo, signal.SIGTERM, grupo=False)
+        codigo, _ = terminar(processo, prazo=20)
+        self.assertEqual(codigo, -signal.SIGTERM)
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
+
+
 if __name__ == "__main__":
     unittest.main()
