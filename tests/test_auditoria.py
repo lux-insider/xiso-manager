@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from apoio import Ambiente, esperar_morrer, matar, sem_cor, vivo  # noqa: E402
+from apoio import Ambiente, carregar_modulo, esperar_morrer, matar, sem_cor, vivo  # noqa: E402
 
 ORIGINAL = b"ISO ORIGINAL " * 1000
 
@@ -246,6 +246,51 @@ class P2TerminalFechado(Base):
         self.assertIsNone(processo.poll(), "com nohup o menu não pode morrer")
         saida, _ = processo.communicate(b"0\n", timeout=10)
         self.assertEqual(processo.returncode, 0)
+
+
+# ── 3. Leitura da saída das ferramentas ─────────────────────────────────────
+
+class L1EventoComTipoErrado(Base):
+    """L-1: um evento JSON com um campo de tipo errado ("bytes": "muito",
+    "mensagem": 123, "hashes": "x"...). Antes: "Erro inesperado" e a
+    ferramenta continuava rodando escondida, presa no pipe."""
+
+    def test_conversao_segue_e_termina(self):
+        destino = self.amb.dir / "GOD"
+        codigo, saida, erros = self.amb.rodar(
+            GOD[:2] + [str(self.iso), str(destino)] + GOD[4:],
+            env={"XMF_SAIDA": "tipos_errados"})
+        saida = sem_cor(saida)
+        self.assertEqual(codigo, 0, erros)
+        self.assertNotIn("inesperado", saida)
+        self.assertIn("Convertendo para GOD concluído", saida)
+        self.assertTrue((destino / "4D5308BF").exists())
+
+    def test_verificar_segue_e_termina(self):
+        codigo, saida, erros = self.amb.rodar(["v", "c", str(self.iso), "", "", "0"],
+                                              env={"XMF_SAIDA": "tipos_errados"})
+        saida = sem_cor(saida)
+        self.assertNotIn("inesperado", saida)
+        self.assertIn("SHA1", saida)
+
+    def test_se_a_leitura_falhar_a_ferramenta_nao_fica_rodando(self):
+        xm = carregar_modulo(self.amb)
+        def quebra(_evento):
+            raise RuntimeError("defeito na leitura")
+        xm._texto_evento = quebra
+        variaveis = dict(LENTO, XMF_PIDS=str(self.amb.pids), XMF_REGISTRO=str(self.amb.registro))
+        os.environ.update(variaveis)
+        self.addCleanup(lambda: [os.environ.pop(k, None) for k in variaveis])
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            r = xm.executar([str(self.amb.bin / "iso2god"), "converter", "--progresso-json",
+                             str(self.iso), str(self.amb.dir / "GOD")], "t")
+        filho = self.amb.esperar_ferramenta()[0]
+        self.addCleanup(matar, filho)
+        self.assertIn("defeito na leitura", r.erro)
+        self.assertFalse(vivo(filho), "a ferramenta tem que ser parada e esperada")
+        self.assertIn("limpou", self.amb.registro_texto())
 
 
 if __name__ == "__main__":
