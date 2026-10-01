@@ -313,6 +313,37 @@ class W1JanelaFechadaNoWindows(Base):
         self.assertEqual(len(xm._pendentes), 1)
 
 
+class P4FerramentaHerdaOTeclado(Base):
+    """P-4: a ferramenta herdava a entrada do menu e podia ler o que o
+    usuário digitava para o menu (um iso2god sem subcomando abre o
+    assistente dele e fica esperando o teclado)."""
+
+    def responder_com_a_ferramenta_rodando(self, entradas):
+        """Num terminal, a linha só existe quando o usuário a digita: ela é
+        mandada só depois que a ferramenta começou a esperar o teclado."""
+        processo = self.amb.iniciar(entradas, env={"XMF_TECLADO": "1"})
+        limite = time.time() + 20
+        while "lendo o teclado" not in self.amb.registro_texto():
+            self.assertLess(time.time(), limite, "a ferramenta não começou")
+            time.sleep(0.02)
+        time.sleep(0.2)
+        processo.stdin.write(b"resposta do menu\n")
+        processo.stdin.flush()
+        while "teclado:" not in self.amb.registro_texto():
+            self.assertLess(time.time(), limite, "a ferramenta ficou esperando o teclado")
+            time.sleep(0.02)
+        processo.stdin.write(b"0\n")
+        codigo, saida = terminar(processo)
+        self.assertIn("teclado: ''", self.amb.registro_texto())
+        self.assertEqual(codigo, 0)
+
+    def test_comando_manual(self):
+        self.responder_com_a_ferramenta_rodando(["9", "2", "info --json x.iso"])
+
+    def test_analisar(self):
+        self.responder_com_a_ferramenta_rodando(["2", "c", str(self.iso)])
+
+
 # ── 3. Leitura da saída das ferramentas ─────────────────────────────────────
 
 class L1EventoComTipoErrado(Base):

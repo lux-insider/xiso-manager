@@ -25,6 +25,7 @@ Variáveis de ambiente:
   XMF_INFO      texto que o `info --json` imprime no stdout
   XMF_PIDS      arquivo onde o PID é anotado quando o trabalho começa
   XMF_REGISTRO  arquivo onde ficam anotados os sinais recebidos e o fim
+  XMF_TECLADO   "1": lê uma linha da entrada padrão e anota o que leu
 """
 
 import json
@@ -378,6 +379,9 @@ def oficial_extrair():
 def main():
     if not ARGS:
         sys.exit(2)
+    if os.environ.get("XMF_TECLADO") == "1":
+        anotar("lendo o teclado")
+        anotar("teclado: %r" % sys.stdin.readline())
     saidas_especiais()
     if "iso2god" in NOME:
         if ARGS[0] == "--help":
