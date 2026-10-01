@@ -2652,6 +2652,28 @@ def acao_reescrever(arquivos=None):
     pausar()
 
 
+def _mesma_pasta(a, b):
+    """As duas pastas são a mesma, por qualquer caminho?
+
+    Comparar o texto não basta: um link simbólico, uma pasta montada em dois
+    lugares, um atalho de rede ou um nome curto 8.3 do Windows dão textos
+    diferentes para a mesma pasta. Tomar a pasta do original por "outra"
+    fazia a reescrita gravar por cima dele e o menu apagar o resultado.
+    """
+    try:
+        return os.path.samefile(a, b)
+    except (OSError, ValueError):
+        return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+def _pode_apagar_original(origem, saida):
+    """O ISO novo existe e não é o próprio original (por outro caminho)?"""
+    try:
+        return os.path.isfile(saida) and not os.path.samefile(saida, origem)
+    except (OSError, ValueError):
+        return False
+
+
 def _reescrever_pt(arquivos, destino, apagar, liberar):
     """Reescrita com o extract-xiso-pt.
 
@@ -2673,7 +2695,7 @@ def _reescrever_pt(arquivos, destino, apagar, liberar):
         origem = os.path.abspath(arquivo)
         pasta_saida = os.path.abspath(destino) if destino else os.path.dirname(origem)
         saida = os.path.join(pasta_saida, os.path.basename(origem))
-        mesma_pasta = os.path.normcase(saida) == os.path.normcase(origem)
+        mesma_pasta = _mesma_pasta(pasta_saida, os.path.dirname(origem))
 
         args = [bin_extract(), "reescrever", origem, "--progresso-json"]
         if mesma_pasta and apagar:
@@ -2703,7 +2725,7 @@ def _reescrever_pt(arquivos, destino, apagar, liberar):
             gerados.append(saida)
             if saida == origem:
                 print(resposta(t("r_substituido"), C.CINZA))
-            elif apagar:
+            elif apagar and _pode_apagar_original(origem, saida):
                 try:
                     os.remove(origem)
                 except OSError as e:
