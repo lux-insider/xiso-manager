@@ -248,6 +248,25 @@ class P2TerminalFechado(Base):
         self.assertEqual(processo.returncode, 0)
 
 
+class P3CtrlCComOPipeCheio(Base):
+    """P-3: Ctrl+C no meio de uma listagem grande. Antes, o menu parava de
+    ler a saída: a ferramenta ficava presa escrevendo no pipe cheio, sem
+    chegar a cancelar, e só saía 35 s depois, morta com SIGKILL."""
+
+    def test_a_ferramenta_sai_logo(self):
+        processo = self.amb.iniciar(["4", "c", str(self.iso), "", "0"],
+                                    env={"XMF_PASSOS": "300000", "XMF_PAUSA": "0"})
+        filho = interromper(self.amb, processo, signal.SIGINT)
+        inicio = time.time()
+        saiu = esperar_morrer(filho, 15)
+        demora = time.time() - inicio
+        matar(filho)
+        terminar(processo)
+        self.assertTrue(saiu, "a ferramenta não saiu em 15 s")
+        self.assertLess(demora, 10)
+        self.assertNotIn("sinal 9", self.amb.registro_texto())
+
+
 # ── 3. Leitura da saída das ferramentas ─────────────────────────────────────
 
 class L1EventoComTipoErrado(Base):
