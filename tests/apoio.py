@@ -167,6 +167,7 @@ def carregar_modulo(ambiente):
     funções soltas). A pasta da cópia vira a pasta do config e do log."""
     for h in list(logging.root.handlers):
         logging.root.removeHandler(h)
+        h.close()
     spec = importlib.util.spec_from_file_location("xiso_manager_teste", ambiente.app / "xiso_manager.py")
     modulo = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(modulo)
