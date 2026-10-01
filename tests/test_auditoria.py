@@ -27,9 +27,19 @@ class Base(unittest.TestCase):
         self.iso = self.amb.iso("Halo.iso", ORIGINAL, pasta=self.jogos)
 
     def arquivos(self, pasta):
+        """{nome: conteúdo} de uma pasta, com o conteúdo resumido: "ORIGINAL",
+        "REESCRITO" (a ISO original reescrita) ou o tamanho."""
         pasta = Path(pasta)
-        return {p.name: p.read_bytes() for p in sorted(pasta.iterdir()) if p.is_file()} \
-            if pasta.exists() else {}
+        if not pasta.exists():
+            return {}
+        resumo = {}
+        for p in sorted(pasta.iterdir()):
+            if p.is_file():
+                dados = p.read_bytes()
+                resumo[p.name] = ("ORIGINAL" if dados == ORIGINAL else
+                                  "REESCRITO" if dados == b"REESCRITO\n" + ORIGINAL else
+                                  "%d bytes" % len(dados))
+        return resumo
 
 
 # ── 1. Arquivos ─────────────────────────────────────────────────────────────
@@ -56,12 +66,38 @@ class R1DestinoQueEhAMesmaPasta(Base):
     def test_apagando_o_antigo_fica_a_iso_reescrita(self):
         arquivos = self.reescrever(apagar=True)
         self.assertEqual(list(arquivos), ["Halo.iso"], "a pasta não pode ficar vazia")
-        self.assertEqual(arquivos["Halo.iso"], b"REESCRITO\n" + ORIGINAL)
+        self.assertEqual(arquivos["Halo.iso"], "REESCRITO")
 
     def test_sem_apagar_o_original_fica_intacto(self):
         arquivos = self.reescrever(apagar=False)
-        self.assertEqual(arquivos.get("Halo.iso"), ORIGINAL, "o original não pode mudar")
-        self.assertEqual(arquivos.get("Halo.xiso.iso"), b"REESCRITO\n" + ORIGINAL)
+        self.assertEqual(arquivos.get("Halo.iso"), "ORIGINAL", "o original não pode mudar")
+        self.assertEqual(arquivos.get("Halo.xiso.iso"), "REESCRITO")
+
+
+class R2OficialComDestinoEmOutraPasta(Base):
+    """R-2: o extract-xiso oficial renomeia o original para <nome>.old na
+    pasta do original, mesmo com -d em outra pasta. O menu procurava o .old
+    no destino: na falha não devolvia o nome, no sucesso não avisava."""
+
+    oficial = True
+
+    def reescrever(self, env=None):
+        destino = self.amb.dir / "otimizados"
+        # destino; apagar? não; sem patch? não; silencioso? não; confirmar; ENTER
+        codigo, saida, erros = self.amb.rodar(
+            ["6", "c", str(self.iso), str(destino), "", "", "", "", "", "0"], env=env)
+        self.assertEqual(codigo, 0, erros)
+        return sem_cor(saida)
+
+    def test_falha_devolve_o_nome_do_original(self):
+        saida = self.reescrever({"XMF_FALHAR": "1"})
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
+        self.assertIn("o ISO original voltou ao nome de antes", saida)
+
+    def test_sucesso_diz_onde_ficou_o_original(self):
+        saida = self.reescrever()
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso.old": "ORIGINAL"})
+        self.assertIn("O ISO original ficou em %s.old" % self.iso, saida)
 
 
 if __name__ == "__main__":

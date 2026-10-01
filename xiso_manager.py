@@ -2579,15 +2579,14 @@ def acao_reescrever(arquivos=None):
                         EMO["arquivo"], largura_rotulo=8))
 
         # Saída sempre com -d: sem ele o ISO novo iria para a pasta em que o
-        # programa foi aberto. Na mesma pasta do original, o extract-xiso
-        # renomeia o original para "<nome>.old" e grava o novo com o nome
-        # de sempre — então o resultado se reconhece pelo NOME, não por um
-        # arquivo novo aparecendo na pasta.
+        # programa foi aberto. O extract-xiso renomeia o original para
+        # "<nome>.old" NA PASTA DO ORIGINAL, qualquer que seja o -d, e grava
+        # o novo com o nome de sempre — então o resultado se reconhece pelo
+        # NOME, não por um arquivo novo aparecendo na pasta.
         origem = os.path.abspath(arquivo)
         pasta_saida = os.path.abspath(destino) if destino else os.path.dirname(origem)
         saida = os.path.join(pasta_saida, os.path.basename(origem))
-        antigo = saida + ".old"
-        mesma_pasta = os.path.normcase(saida) == os.path.normcase(origem)
+        antigo = origem + ".old"
         try:
             antes = os.stat(saida).st_mtime_ns
         except OSError:
@@ -2615,9 +2614,9 @@ def acao_reescrever(arquivos=None):
             depois = None
         gravou = depois is not None and depois != antes
 
-        # Falha no meio de uma reescrita na mesma pasta: o original ficou
-        # como "<nome>.old" e o ISO de sempre sumiu. Desfaz o nome.
-        if not r.ok and mesma_pasta and not os.path.exists(origem) and os.path.exists(antigo):
+        # Falha no meio da reescrita: o original ficou como "<nome>.old" e o
+        # ISO de sempre sumiu. Desfaz o nome (em qualquer pasta de destino).
+        if not r.ok and not os.path.exists(origem) and os.path.exists(antigo):
             try:
                 os.replace(antigo, origem)
                 aviso(t("r_original_restaurado"))
