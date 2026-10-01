@@ -267,6 +267,52 @@ class P3CtrlCComOPipeCheio(Base):
         self.assertNotIn("sinal 9", self.amb.registro_texto())
 
 
+class W1JanelaFechadaNoWindows(Base):
+    """W-1: no Windows, fechar a janela matava o menu na hora, e a reescrita
+    do extract-xiso oficial ficava pela metade, com o original como .old. O
+    tratador do console (que só existe no Windows) chama esta função; aqui
+    ela é chamada direto, com a reescrita interrompida já no disco."""
+
+    def preparar(self, segundos):
+        xm = carregar_modulo(self.amb)
+        # a função cala a saída (a janela já não existe): devolve a do teste
+        self.addCleanup(setattr, sys, "stdout", sys.stdout)
+        self.addCleanup(setattr, sys, "stderr", sys.stderr)
+        origem = str(self.iso)
+        antigo = origem + ".old"
+        marca = xm._marcar_original(origem, antigo, origem)
+        os.rename(origem, antigo)
+        self.iso.write_bytes(b"pela metade")
+        xm._pendentes.append(marca)
+        xm._ferramenta = __import__("subprocess").Popen(
+            [sys.executable, "-c", "import time; time.sleep(%s)" % segundos])
+        self.addCleanup(lambda: matar(xm._ferramenta.pid))
+        return xm
+
+    def test_espera_a_ferramenta_e_desfaz(self):
+        xm = self.preparar(0.5)
+        self.assertTrue(xm._ao_fechar_console(2))           # CTRL_CLOSE_EVENT
+        self.assertIsNotNone(xm._ferramenta.poll(), "esperou a ferramenta sair")
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
+        self.assertIsNotNone(xm._encerrar)
+        self.assertIn("Sessão encerrada", (self.amb.app / "xiso-manager.log").read_text())
+
+    def test_ferramenta_que_nao_sai_tem_prazo(self):
+        xm = self.preparar(30)
+        xm.PRAZO_JANELA = 0.3
+        inicio = time.time()
+        self.assertTrue(xm._ao_fechar_console(6))           # CTRL_SHUTDOWN_EVENT
+        self.assertLess(time.time() - inicio, 3)
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
+
+    def test_ctrl_c_segue_para_o_python(self):
+        xm = self.preparar(0)
+        for evento in (0, 1):                               # CTRL_C, CTRL_BREAK
+            self.assertFalse(xm._ao_fechar_console(evento))
+        self.assertIsNone(xm._encerrar)
+        self.assertEqual(len(xm._pendentes), 1)
+
+
 # ── 3. Leitura da saída das ferramentas ─────────────────────────────────────
 
 class L1EventoComTipoErrado(Base):
