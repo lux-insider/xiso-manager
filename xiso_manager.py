@@ -3181,6 +3181,8 @@ def mostrar_info_iso2god(arquivo):
     try:
         info = json.loads(r.stdout)
     except ValueError:
+        info = None
+    if not isinstance(info, dict):
         # o motivo já saiu acima, pelo stderr do iso2god
         if not r.stderr.strip():
             erro(t("erro_inesperado"))
@@ -3190,8 +3192,10 @@ def mostrar_info_iso2god(arquivo):
         v = info.get(chave)
         return str(v) if v not in (None, "") else None
 
+    # Os campos vêm de outro programa: um tipo errado vale como ausente, em
+    # vez de derrubar a análise das outras ISOs da seleção.
     plataforma = {"xbox360": "Xbox 360", "xbox": "Xbox"}.get(
-        info.get("plataforma_detectada"), None)
+        _texto(info.get("plataforma_detectada")), None)
     if plataforma:
         print(campo(t("i_plataforma"), plataforma, EMO["jogo"], largura_rotulo=16))
     else:
@@ -3203,7 +3207,7 @@ def mostrar_info_iso2god(arquivo):
     if info.get("disco"):
         print(campo(t("i_disco"), "%s/%s" % (info["disco"], info.get("total_discos") or "?"),
                     EMO["disco"], largura_rotulo=16))
-    if info.get("tamanho_volume"):
+    if _numero(info.get("tamanho_volume")):
         print(campo(t("i_volume"), "%s  %s" % (fmt_bytes(info["tamanho_volume"]),
                                               cor("(" + str(info.get("tipo_disco", "")) + ")", C.CINZA)),
                     EMO["disco"], largura_rotulo=16))
