@@ -2510,6 +2510,54 @@ def acao_criar():
     pausar()
 
 
+def _marcar_original(origem, antigo, saida):
+    """Antes da reescrita com o extract-xiso oficial: o que é preciso para
+    reconhecer o original depois, se ele ficar como "<nome>.old".
+
+    O oficial renomeia o original para .old antes de começar e não trata
+    sinal nenhum: um Ctrl+C, um SIGTERM ou o terminal fechado o matam no
+    meio, deixando o ISO novo pela metade com o nome do original. Então não
+    basta olhar se o nome do original está livre: o .old é o original se
+    não existia antes e tem o tamanho e a data dele (o rename preserva os
+    dois)."""
+    try:
+        st = os.stat(origem)
+    except OSError:
+        return None
+    return {"origem": origem, "antigo": antigo, "saida": saida,
+            "assinatura": (st.st_size, st.st_mtime_ns),
+            "havia_antigo": os.path.lexists(antigo),
+            "havia_saida": os.path.lexists(saida)}
+
+
+def _desfazer_reescrita(marca):
+    """Depois de uma reescrita que não terminou bem: devolve o nome ao
+    original. Devolve (erro, desfeito): `desfeito` é True quando o original
+    voltou ao nome; `erro` é a falha do rename quando ele não pôde voltar."""
+    if not marca or marca["havia_antigo"]:
+        return None, False
+    origem, antigo, saida = marca["origem"], marca["antigo"], marca["saida"]
+    try:
+        st = os.stat(antigo)
+    except OSError:
+        return None, False          # o original nem chegou a ser renomeado
+    if (st.st_size, st.st_mtime_ns) != marca["assinatura"]:
+        return None, False
+    # A sobra pela metade em outra pasta, criada por esta reescrita, sai.
+    # Na mesma pasta ela tem o nome do original e é coberta pelo rename.
+    if not marca["havia_saida"] and not _mesma_pasta(os.path.dirname(saida),
+                                                      os.path.dirname(origem)):
+        try:
+            os.remove(saida)
+        except OSError:
+            pass
+    try:
+        os.replace(antigo, origem)
+    except OSError as e:
+        return e, False
+    return None, True
+
+
 def acao_reescrever(arquivos=None):
     tela(t("m_reescrever"), EMO["otimizar"], t("d_reescrever"), C.AMARE)
     if not exigir_binario(bin_extract(), "extract-xiso"):
@@ -2591,6 +2639,7 @@ def acao_reescrever(arquivos=None):
             antes = os.stat(saida).st_mtime_ns
         except OSError:
             antes = None
+        marca = _marcar_original(origem, antigo, saida)
 
         args = [bin_extract(), "-r", "-d", pasta_saida]
         if apagar:
@@ -2614,14 +2663,15 @@ def acao_reescrever(arquivos=None):
             depois = None
         gravou = depois is not None and depois != antes
 
-        # Falha no meio da reescrita: o original ficou como "<nome>.old" e o
-        # ISO de sempre sumiu. Desfaz o nome (em qualquer pasta de destino).
-        if not r.ok and not os.path.exists(origem) and os.path.exists(antigo):
-            try:
-                os.replace(antigo, origem)
+        # Falha ou interrupção no meio da reescrita: o original ficou como
+        # "<nome>.old", e no lugar dele pode haver o ISO novo pela metade.
+        # Desfaz o nome (em qualquer pasta de destino).
+        if not r.ok:
+            falha, desfeito = _desfazer_reescrita(marca)
+            if desfeito:
                 aviso(t("r_original_restaurado"))
-            except OSError as e:
-                erro("%s %s (%s)" % (t("r_original_em"), antigo, e))
+            elif falha is not None:
+                erro("%s %s (%s)" % (t("r_original_em"), antigo, falha))
 
         # O extract-xiso pula ISOs que já estão otimizados e sai com
         # código 0, sem gravar nada.
