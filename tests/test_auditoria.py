@@ -199,5 +199,54 @@ class P1Sigterm(Base):
         self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
 
 
+class P2TerminalFechado(Base):
+    """P-2: fechar o terminal manda SIGHUP ao menu e à ferramenta. Antes, o
+    menu morria na hora: as -pt limpavam sozinhas, mas a reescrita do
+    extract-xiso oficial ficava pela metade, com o original como .old."""
+
+    def fechar_no_meio(self, respostas):
+        processo, mestre = self.amb.iniciar_no_terminal(respostas, env=LENTO)
+        filho = self.amb.esperar_ferramenta()[0]
+        time.sleep(0.3)
+        os.close(mestre)
+        try:
+            processo.wait(timeout=20)
+        except Exception:
+            processo.kill()
+            raise AssertionError("o menu não saiu depois de o terminal fechar")
+        return processo.returncode, filho
+
+    def test_reescrita_oficial_volta_ao_nome(self):
+        self.amb.config(bin_extract_xiso=str(self.amb.bin / "extract-xiso"))
+        codigo, filho = self.fechar_no_meio(["6", "c", str(self.iso), "", "", "", "", "", "", "0"])
+        self.assertEqual(codigo, -signal.SIGHUP)
+        self.assertFalse(vivo(filho))
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
+
+    def test_conversao_limpa_e_ninguem_fica_rodando(self):
+        destino = self.amb.dir / "GOD"
+        codigo, filho = self.fechar_no_meio(GOD[:2] + [str(self.iso), str(destino)] + GOD[4:])
+        self.assertEqual(codigo, -signal.SIGHUP)
+        self.assertTrue(esperar_morrer(filho, 5))
+        self.assertEqual(list(destino.rglob("*")) if destino.exists() else [], [])
+
+    def test_com_nohup_o_menu_continua(self):
+        """Com o SIGHUP ignorado (nohup), ele continua ignorado."""
+        import subprocess
+        processo = subprocess.Popen(
+            [sys.executable, "-c", "import signal, subprocess, sys; "
+             "signal.signal(signal.SIGHUP, signal.SIG_IGN); "
+             "sys.exit(subprocess.call([sys.executable, sys.argv[1]]))",
+             str(self.amb.app / "xiso_manager.py")],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=self.amb.env, start_new_session=True)
+        time.sleep(0.8)
+        os.killpg(processo.pid, signal.SIGHUP)
+        time.sleep(0.3)
+        self.assertIsNone(processo.poll(), "com nohup o menu não pode morrer")
+        saida, _ = processo.communicate(b"0\n", timeout=10)
+        self.assertEqual(processo.returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -683,6 +683,8 @@ def _ao_receber_sinal(numero, _quadro):
     global _encerrar
     primeiro = _encerrar is None
     _encerrar = numero
+    if numero == getattr(signal, "SIGHUP", None):
+        _silenciar_saida()
     filho = _ferramenta
     if filho is not None and filho.poll() is None:
         if primeiro:
@@ -697,10 +699,25 @@ def _ao_receber_sinal(numero, _quadro):
     raise Encerramento(numero)
 
 
+def _silenciar_saida():
+    """O terminal foi fechado: escrever nele dá erro de E/S, e um erro no
+    meio do caminho impediria a limpeza. Daqui em diante a saída vai para o
+    nada (o log continua)."""
+    try:
+        nulo = open(os.devnull, "w", encoding="utf-8")
+    except OSError:
+        return
+    sys.stdout = sys.stderr = nulo
+
+
 def instalar_sinais():
     if WINDOWS:
         return
     signal.signal(signal.SIGTERM, _ao_receber_sinal)
+    # Terminal fechado: o mesmo cuidado do SIGTERM. Se o SIGHUP já chega
+    # ignorado (nohup), quem rodou assim quer que o menu continue.
+    if signal.getsignal(signal.SIGHUP) != signal.SIG_IGN:
+        signal.signal(signal.SIGHUP, _ao_receber_sinal)
 
 
 def _desfazer_pendentes():

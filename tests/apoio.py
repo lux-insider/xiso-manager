@@ -86,6 +86,30 @@ class Ambiente:
         processo.stdin.flush()
         return processo
 
+    def iniciar_no_terminal(self, entradas, env=None):
+        """Roda o menu num pseudoterminal que é o terminal de controle da
+        sessão, como numa janela de terminal. Devolve (processo, mestre):
+        fechar o `mestre` é fechar a janela (o sistema manda SIGHUP)."""
+        import fcntl
+        import pty
+        import termios
+        mestre, escravo = pty.openpty()
+        atributos = termios.tcgetattr(escravo)
+        atributos[3] &= ~termios.ECHO
+        termios.tcsetattr(escravo, termios.TCSANOW, atributos)
+
+        def controlar():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        processo = subprocess.Popen(
+            [sys.executable, str(self.app / "xiso_manager.py")],
+            stdin=escravo, stdout=escravo, stderr=escravo,
+            env=dict(self.env, **(env or {})), preexec_fn=controlar)
+        os.close(escravo)
+        os.write(mestre, "".join(e + "\n" for e in entradas).encode("utf-8"))
+        return processo, mestre
+
     def rodar(self, entradas, env=None, prazo=60, cwd=None):
         processo = self.iniciar(entradas, env, cwd=cwd)
         try:
