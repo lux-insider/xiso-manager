@@ -635,5 +635,27 @@ class E2IntervaloEnorme(Base):
         self.assertEqual(invalidos, [str(n) for n in range(4, 1001)])
 
 
+class E3DigitosQueNaoSaoDeZeroANove(Base):
+    """E-3: "²".isdigit() é verdadeiro, mas int("²") falha: a escolha virava
+    "Erro inesperado". O mesmo com um número de milhares de algarismos, que
+    o int recusa."""
+
+    def test_selecao(self):
+        xm = carregar_modulo(self.amb)
+        enorme = "1" * 5000
+        self.assertEqual(xm._expandir_selecao("², 1-², %s, 2-%s, 1" % (enorme, enorme), 3),
+                         ([0], ["²", "1-²", enorme, "2-" + enorme]))
+        self.assertEqual(xm._expandir_selecao("٣", 3), ([2], []))
+
+    def test_menus_de_escolha(self):
+        self.amb.config(pasta_padrao=str(self.jogos))
+        for entradas in (["7", "c", str(self.iso), "²", "", "0"],    # assistente
+                         ["8", "", "²", "0"],                        # lote
+                         ["3", "²", "", "0", "0"]):                  # navegador
+            codigo, saida, erros = self.amb.rodar(entradas)
+            self.assertEqual(codigo, 0, erros)
+            self.assertNotIn("Erro inesperado", saida, entradas)
+
+
 if __name__ == "__main__":
     unittest.main()

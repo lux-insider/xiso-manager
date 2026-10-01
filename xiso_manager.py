@@ -2277,6 +2277,19 @@ def listar_isos(pasta):
                   and os.path.isfile(os.path.join(pasta, n)))
 
 
+def _inteiro(texto):
+    """O número digitado, ou None. Só algarismos decimais: "²".isdigit() é
+    verdadeiro, mas o int o recusa, como recusa um número com milhares de
+    algarismos."""
+    texto = texto.strip()
+    if not texto.isdecimal():
+        return None
+    try:
+        return int(texto)
+    except ValueError:
+        return None
+
+
 def _expandir_selecao(texto, total):
     """'1,3,5-7' -> [0,2,4,5,6]"""
     indices, invalidos = [], []
@@ -2286,8 +2299,8 @@ def _expandir_selecao(texto, total):
             continue
         if "-" in parte and not parte.startswith("-"):
             a_txt, _, b_txt = parte.partition("-")
-            if a_txt.strip().isdigit() and b_txt.strip().isdigit():
-                a, b = int(a_txt), int(b_txt)
+            a, b = _inteiro(a_txt), _inteiro(b_txt)
+            if a is not None and b is not None:
                 if a > b:
                     a, b = b, a
                 # Só a parte que existe é percorrida: "1-999999999" não pode
@@ -2302,12 +2315,9 @@ def _expandir_selecao(texto, total):
                 else:
                     invalidos.extend(str(n) for n in range(acima, b + 1))
                 continue
-        if parte.isdigit():
-            n = int(parte)
-            if 1 <= n <= total:
-                indices.append(n - 1)
-            else:
-                invalidos.append(parte)
+        n = _inteiro(parte)
+        if n is not None and 1 <= n <= total:
+            indices.append(n - 1)
         else:
             invalidos.append(parte)
     vistos, limpos = set(), []
@@ -3415,8 +3425,9 @@ def acao_assistente():
     if not escolha:
         escolhas[0][3]()
         return
-    if escolha.isdigit() and 1 <= int(escolha) <= len(escolhas):
-        escolhas[int(escolha) - 1][3]()
+    numero = _inteiro(escolha)
+    if numero is not None and 1 <= numero <= len(escolhas):
+        escolhas[numero - 1][3]()
         return
     aviso(t("opcao_invalida"))
     pausar()
@@ -3486,8 +3497,9 @@ def acao_lote():
     print(opcao("0", t("voltar"), EMO["sair"], C.VERM))
 
     escolha = perguntar(t("escolha"), obrigatorio=False).strip()
-    if escolha.isdigit() and 1 <= int(escolha) <= len(escolhas):
-        escolhas[int(escolha) - 1][2]()
+    numero = _inteiro(escolha)
+    if numero is not None and 1 <= numero <= len(escolhas):
+        escolhas[numero - 1][2]()
 
 
 def acao_manual():
