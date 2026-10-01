@@ -1840,8 +1840,22 @@ RE_QUEBRA = re.compile(r"[\r\n]")
 LIMITE_LINHA = 256 * 1024
 
 # O extract-xiso anima o próprio progresso com \b, e outras ferramentas
-# emitem cor. Cru, isso vaza como lixo na nossa tabela.
-RE_CONTROLE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+# emitem cor. Cru, isso vaza como lixo na nossa tabela. O título do jogo vem
+# de dentro da ISO: as sequências de escape inteiras (cor, limpar a tela,
+# trocar o título da janela), os controles C1 (\x9b abre uma sequência em
+# alguns terminais) e os que invertem a direção do texto também saem.
+RE_CONTROLE = re.compile(
+    r"\x1b\[[0-?]*[ -/]*[@-~]|\x9b[0-?]*[ -/]*[@-~]"
+    r"|[\x1b][\]PX^_][^\x07\x1b\x9c]*(?:\x07|\x1b\\|\x9c)"
+    r"|[\x9d\x90\x98\x9e\x9f][^\x07\x1b\x9c]*(?:\x07|\x1b\\|\x9c)"
+    r"|\x1b[ -/]*[0-~]"
+    r"|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+
+
+def _sem_controle(texto):
+    """Texto de outro programa sem nada que o terminal interprete; ao
+    contrário de `_limpar_linha_externa`, mantém os espaços como estão."""
+    return RE_CONTROLE.sub("", re.sub(r"[\t\r\n]", " ", str(texto)))
 
 
 def _evento_json(linha):
@@ -1993,7 +2007,7 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
             if evento is not None:
                 if evento.get("evento") == "verificado":
                     for l in _linhas_verificado(evento):
-                        resultado.saida.append(l)
+                        resultado.saida.append(_sem_controle(l))
                         resultado.total_linhas += 1
                     return
                 if evento.get("evento") == "progresso":
@@ -2003,7 +2017,7 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
                         fiscal.definir_percentual(
                             max(0.0, min(1.0, feito / total_bytes)))
                     return
-                linha = _texto_evento(evento)
+                linha = _sem_controle(_texto_evento(evento))
                 if not linha:
                     return
             # ferramentas que usam \r repetem a mesma linha várias vezes
@@ -3190,7 +3204,7 @@ def mostrar_info_iso2god(arquivo):
 
     def valor(chave):
         v = info.get(chave)
-        return str(v) if v not in (None, "") else None
+        return _sem_controle(v) if v not in (None, "") else None
 
     # Os campos vêm de outro programa: um tipo errado vale como ausente, em
     # vez de derrubar a análise das outras ISOs da seleção.
@@ -3205,11 +3219,11 @@ def mostrar_info_iso2god(arquivo):
         if valor(chave):
             print(campo(rotulo, valor(chave), EMO["info"], largura_rotulo=16))
     if info.get("disco"):
-        print(campo(t("i_disco"), "%s/%s" % (info["disco"], info.get("total_discos") or "?"),
+        print(campo(t("i_disco"), "%s/%s" % (valor("disco"), valor("total_discos") or "?"),
                     EMO["disco"], largura_rotulo=16))
     if _numero(info.get("tamanho_volume")):
         print(campo(t("i_volume"), "%s  %s" % (fmt_bytes(info["tamanho_volume"]),
-                                              cor("(" + str(info.get("tipo_disco", "")) + ")", C.CINZA)),
+                                              cor("(" + (valor("tipo_disco") or "") + ")", C.CINZA)),
                     EMO["disco"], largura_rotulo=16))
     print()
     return r.returncode == 0
