@@ -1825,21 +1825,36 @@ def _evento_json(linha):
     return evento if isinstance(evento, dict) and "evento" in evento else None
 
 
+def _numero(valor):
+    """O valor, se for um número de verdade; senão None. Os eventos vêm de
+    outro programa: um campo de tipo errado não pode derrubar a leitura."""
+    if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+        return valor
+    return None
+
+
+def _texto(valor):
+    return valor if isinstance(valor, str) else ""
+
+
 def _linhas_verificado(evento):
     """Relatório do `verificar --progresso-json` do extract-xiso-pt."""
-    h = evento.get("hashes") or {}
+    h = evento.get("hashes")
+    h = h if isinstance(h, dict) else {}
     completo = evento.get("disco_completo")
     linhas = ["%s · %s" % (evento.get("layout", "?"),
                            "disco completo" if completo else
                            "enxuta" if completo is None else "tamanho fora do padrão"),
               "estrutura íntegra · %s arquivos em %s pastas"
               % (evento.get("arquivos", "?"), evento.get("diretorios", "?"))]
-    linhas += ["aviso: " + a for a in evento.get("avisos") or []]
+    avisos = evento.get("avisos")
+    linhas += ["aviso: " + a for a in (avisos if isinstance(avisos, list) else [])
+               if isinstance(a, str)]
     for nome in ("crc32", "md5", "sha1"):
         if h.get(nome):
             linhas.append("%-6s %s" % (nome.upper(), h[nome]))
     dat = evento.get("dat")
-    if dat:
+    if isinstance(dat, dict) and dat:
         situacao = dat.get("situacao")
         if situacao == "confere":
             linhas.append("ORIGINAL: idêntica ao Redump — %s" % dat.get("jogo", "?"))
@@ -1860,9 +1875,10 @@ def _linhas_verificado(evento):
 def _texto_evento(evento):
     """Texto legível de um evento `fase`/`concluido`/`erro` do iso2god."""
     tipo = evento.get("evento")
-    mensagem = evento.get("mensagem", "")
-    if tipo == "concluido" and evento.get("pasta") and evento["pasta"] not in mensagem:
-        return "%s %s" % (mensagem, evento["pasta"]) if mensagem else evento["pasta"]
+    mensagem = _texto(evento.get("mensagem", ""))
+    pasta = _texto(evento.get("pasta"))
+    if tipo == "concluido" and pasta and pasta not in mensagem:
+        return "%s %s" % (mensagem, pasta) if mensagem else pasta
     if tipo == "erro":
         return "erro: " + mensagem
     return mensagem
@@ -1879,6 +1895,28 @@ def _limpar_linha_externa(texto):
             saida.append(ch)
     limpo = RE_CONTROLE.sub("", "".join(saida))
     return re.sub(r"\s+", " ", limpo).strip()
+
+
+def _escoar(processo):
+    """Lê e descarta o resto da saída da ferramenta."""
+    try:
+        while os.read(processo.stdout.fileno(), 65536):
+            pass
+    except (OSError, ValueError):
+        pass
+
+
+def _esperar_ferramenta(processo, prazo=None):
+    """Espera a ferramenta sair, esvaziando o pipe enquanto isso: sem
+    ninguém lendo, uma ferramenta que estava imprimindo fica presa na
+    escrita e nunca chega a cancelar e limpar. Passado o prazo, força."""
+    leitor = threading.Thread(target=_escoar, args=(processo,), daemon=True)
+    leitor.start()
+    try:
+        processo.wait(timeout=PRAZO_LIMPEZA if prazo is None else prazo)
+    except subprocess.TimeoutExpired:
+        _forcar_fim(processo)
+    leitor.join(timeout=1.0)
 
 
 def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
@@ -1929,10 +1967,11 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
                             resultado.total_linhas += 1
                         continue
                     if evento.get("evento") == "progresso":
-                        total_bytes = evento.get("total_bytes") or 0
-                        if total_bytes:
+                        total_bytes = _numero(evento.get("total_bytes")) or 0
+                        feito = _numero(evento.get("bytes", 0)) or 0
+                        if total_bytes > 0:
                             fiscal.definir_percentual(
-                                min(1.0, evento.get("bytes", 0) / total_bytes))
+                                max(0.0, min(1.0, feito / total_bytes)))
                         continue
                     linha = _texto_evento(evento)
                     if not linha:
@@ -1996,6 +2035,14 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
     except Exception as e:
         resultado.erro = f"{t('erro_inesperado')}: {e}"
         log_evento("erro", str(e))
+        if processo is not None and processo.poll() is None:
+            # Sem a leitura, a ferramenta ficaria presa no pipe, escondida:
+            # pede para ela parar (as -pt cancelam e limpam) e espera.
+            try:
+                processo.send_signal(signal.SIGTERM)
+            except OSError:
+                pass
+            _esperar_ferramenta(processo)
     finally:
         _ferramenta = None
         resultado.duracao = fiscal.encerrar(ok=resultado.ok)
