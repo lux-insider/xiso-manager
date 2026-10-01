@@ -508,5 +508,28 @@ class E1CtrlCNaConfirmacao(Base):
         self.assertIn("Operação cancelada pelo usuário.", saida)
 
 
+class E2IntervaloEnorme(Base):
+    """E-2: cada número de um intervalo virava um item; "1-3000000" gerava 3
+    milhões de textos de "inválido" e "1-999999999" esgotava a memória."""
+
+    def setUp(self):
+        super().setUp()
+        self.xm = carregar_modulo(self.amb)
+
+    def test_intervalo_grande(self):
+        inicio = time.time()
+        resultado = self.xm._expandir_selecao("0-3000000, 1", 3)
+        self.assertLess(time.time() - inicio, 0.5)
+        self.assertEqual(resultado, ([0, 1, 2], ["0", "4-3000000"]))
+        self.assertEqual(self.xm._expandir_selecao("999999999-2", 3),
+                         ([1, 2], ["4-999999999"]))
+
+    def test_intervalo_pequeno_igual_a_antes(self):
+        self.assertEqual(self.xm._expandir_selecao("0-5,3-1,9,x", 3),
+                         ([0, 1, 2], ["0", "4", "5", "9", "x"]))
+        _, invalidos = self.xm._expandir_selecao("1-1000", 3)
+        self.assertEqual(invalidos, [str(n) for n in range(4, 1001)])
+
+
 if __name__ == "__main__":
     unittest.main()

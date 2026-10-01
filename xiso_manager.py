@@ -2225,9 +2225,17 @@ def _expandir_selecao(texto, total):
                 a, b = int(a_txt), int(b_txt)
                 if a > b:
                     a, b = b, a
-                for n in range(a, b + 1):
-                    (indices if 1 <= n <= total else invalidos).append(
-                        n - 1 if 1 <= n <= total else str(n))
+                # Só a parte que existe é percorrida: "1-999999999" não pode
+                # virar um bilhão de itens. Acima do total, até 1000 números
+                # saem um a um, como sempre; mais que isso, num item só.
+                if a == 0:
+                    invalidos.append("0")
+                indices.extend(range(max(a, 1) - 1, min(b, total)))
+                acima = max(a, total + 1)
+                if b - acima >= 1000:
+                    invalidos.append("%d-%d" % (acima, b))
+                else:
+                    invalidos.extend(str(n) for n in range(acima, b + 1))
                 continue
         if parte.isdigit():
             n = int(parte)
