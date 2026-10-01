@@ -1945,11 +1945,26 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
         processo = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, bufsize=0)
         _ferramenta = processo
+        # O verificar --progresso-json do extract-xiso-pt manda o erro duas
+        # vezes: como evento JSON e como texto ("❌ <mensagem>", ou "X" no
+        # console antigo do Windows). Fica só a primeira que chegar.
+        erros_evento, erros_texto = set(), set()
 
         def tratar(linha):
             # iso2god próprio com --progresso-json: uma linha JSON por
             # evento. O progresso vira a barra; o resto, texto legível.
             evento = _evento_json(linha)
+            if evento is not None and evento.get("evento") == "erro":
+                mensagem = _limpar_linha_externa(_texto(evento.get("mensagem")))
+                if mensagem in erros_texto:
+                    return
+                erros_evento.add(mensagem)
+            elif evento is None:
+                marca, _, mensagem = linha.partition(" ")
+                if marca in ("\u274C", "X") and mensagem:
+                    if mensagem in erros_evento:
+                        return
+                    erros_texto.add(mensagem)
             if evento is not None:
                 if evento.get("evento") == "verificado":
                     for l in _linhas_verificado(evento):

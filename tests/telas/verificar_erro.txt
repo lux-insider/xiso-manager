@@ -74,8 +74,7 @@
   ▸ Instalar um .dat ou .zip do Redump? Caminho do arquivo (ENTER = usar os já instalados):
   ── 3/3 · Resultado ─────────────────────────────────────────────
     ├ Verificando Halo.iso
-    ├ erro: a imagem está truncada: termina no setor 1000, o vo…
-    └ ❌ a imagem está truncada: termina no setor 1000, o volum…
+    └ erro: a imagem está truncada: termina no setor 1000, o vo…
   ✗  Verificando      O programa terminou com código de erro 1
 
 ╭────────────────────────────────────────────────────────────────╮
