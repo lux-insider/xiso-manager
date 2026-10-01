@@ -278,6 +278,8 @@ class W1JanelaFechadaNoWindows(Base):
         # a função cala a saída (a janela já não existe): devolve a do teste
         self.addCleanup(setattr, sys, "stdout", sys.stdout)
         self.addCleanup(setattr, sys, "stderr", sys.stderr)
+        saida = sys.stdout
+        self.addCleanup(lambda: sys.stdout is not saida and sys.stdout.close())
         origem = str(self.iso)
         antigo = origem + ".old"
         marca = xm._marcar_original(origem, antigo, origem)
