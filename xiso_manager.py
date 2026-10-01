@@ -24,6 +24,7 @@ import logging
 import unicodedata
 import subprocess
 import collections
+import signal
 import struct
 import threading
 from pathlib import Path
@@ -640,9 +641,105 @@ def prompt(texto):
     return f"\n  {cor(SIM_SETA, C.CIANO)} {texto}: "
 
 
+# ═════════════════════════════════════════════════════════════════════════
+# ENCERRAMENTO POR SINAL (SIGTERM, terminal fechado)
+# ═════════════════════════════════════════════════════════════════════════
+
+class Encerramento(BaseException):
+    """O menu recebeu um pedido para sair (SIGTERM, SIGHUP). Não é Exception
+    nem KeyboardInterrupt: nada no caminho a engole, e ele chega ao fim do
+    programa, que sai pelo mesmo sinal."""
+
+    def __init__(self, sinal):
+        super().__init__(sinal)
+        self.sinal = sinal
+
+
+_ferramenta = None      # a ferramenta externa rodando agora (Popen)
+_encerrar = None        # o sinal de saída recebido, se algum
+_pendentes = []         # reescritas do extract-xiso oficial em andamento
+PRAZO_LIMPEZA = 30      # quanto esperar a ferramenta limpar o que criou
+
+
+def _forcar_fim(processo):
+    """A ferramenta não saiu no prazo depois do pedido: encerra à força."""
+    try:
+        if processo.poll() is None:
+            processo.terminate()
+            try:
+                processo.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                processo.kill()
+    except OSError:
+        pass
+
+
+def _ao_receber_sinal(numero, _quadro):
+    """SIGTERM ou SIGHUP. Sem ferramenta rodando, sai na hora. Com uma
+    rodando, pede a ela que pare (SIGTERM: as ferramentas -pt cancelam e
+    apagam o que criaram) e deixa o menu esperá-la terminar, desfazer o que
+    for preciso e só então sair. Morrer na hora deixava a ferramenta
+    trabalhando escondida, sem ninguém lendo o que ela imprime."""
+    global _encerrar
+    primeiro = _encerrar is None
+    _encerrar = numero
+    filho = _ferramenta
+    if filho is not None and filho.poll() is None:
+        if primeiro:
+            try:
+                filho.send_signal(signal.SIGTERM)
+            except OSError:
+                pass
+            vigia = threading.Timer(PRAZO_LIMPEZA, _forcar_fim, (filho,))
+            vigia.daemon = True
+            vigia.start()
+        return
+    raise Encerramento(numero)
+
+
+def instalar_sinais():
+    if WINDOWS:
+        return
+    signal.signal(signal.SIGTERM, _ao_receber_sinal)
+
+
+def _desfazer_pendentes():
+    """Desfaz as reescritas do extract-xiso oficial que não terminaram
+    (chamado na saída por sinal, que pode pular o caminho normal)."""
+    while _pendentes:
+        _desfazer_reescrita(_pendentes.pop())
+
+
+def _ler(texto):
+    """input() que não espera resposta depois de um pedido de saída."""
+    if _encerrar is not None:
+        raise Encerramento(_encerrar)
+    return input(texto)
+
+
+def _sair_pelo_sinal(sinal):
+    """Sai como sairia sem o tratador: morto pelo mesmo sinal."""
+    filho = _ferramenta
+    if filho is not None and filho.poll() is None:
+        try:
+            filho.send_signal(signal.SIGTERM)
+            filho.wait(timeout=PRAZO_LIMPEZA)
+        except Exception:
+            _forcar_fim(filho)
+    _desfazer_pendentes()
+    log_evento("info", "Sessão encerrada")
+    try:
+        sys.stdout.flush()
+    except Exception:
+        pass
+    signal.signal(sinal, signal.SIG_DFL)
+    os.kill(os.getpid(), sinal)
+    os._exit(128 + sinal)
+
+
 def pausar():
     try:
-        input(f"\n  {cor(SIM_SETA, C.CINZA)} {cor(t('enter_continuar'), C.CINZA)}")
+        _ler(f"\n  {cor(SIM_SETA, C.CINZA)} {cor(t('enter_continuar'), C.CINZA)}")
     except (EOFError, KeyboardInterrupt):
         print()
 
@@ -1783,9 +1880,11 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
     processo = None
     inicio = time.time()
 
+    global _ferramenta
     try:
         processo = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, bufsize=0)
+        _ferramenta = processo
         buffer = ""
         while True:
             try:
@@ -1843,6 +1942,11 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
         processo.wait()
         resultado.codigo = processo.returncode
         resultado.ok = (processo.returncode == 0)
+        if _encerrar is not None:
+            # parou porque o menu recebeu SIGTERM/SIGHUP: é um cancelamento
+            resultado.ok = False
+            resultado.cancelado = True
+            resultado.erro = t("interrompido")
 
     except FileNotFoundError:
         resultado.erro = t("erro_bin_sumiu")
@@ -1876,6 +1980,7 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
         resultado.erro = f"{t('erro_inesperado')}: {e}"
         log_evento("erro", str(e))
     finally:
+        _ferramenta = None
         resultado.duracao = fiscal.encerrar(ok=resultado.ok)
 
     # linha final da barra, já com o número real
@@ -1910,7 +2015,7 @@ def perguntar(texto, obrigatorio=True, padrao=None):
     while True:
         sufixo = cor(f" [{padrao}]", C.CINZA) if padrao else ""
         try:
-            resp = input(prompt(f"{cor(texto, C.BRANC)}{sufixo}")).strip()
+            resp = _ler(prompt(f"{cor(texto, C.BRANC)}{sufixo}")).strip()
         except EOFError:
             return padrao if padrao is not None else ""
         except KeyboardInterrupt:
@@ -1926,7 +2031,7 @@ def perguntar(texto, obrigatorio=True, padrao=None):
 def perguntar_sim_nao(texto, padrao_sim=False):
     sufixo = t("sim_nao_s") if padrao_sim else t("sim_nao_n")
     try:
-        resp = input(prompt(f"{cor(texto, C.BRANC)} {cor('[' + sufixo + ']', C.CINZA)}")).strip().lower()
+        resp = _ler(prompt(f"{cor(texto, C.BRANC)} {cor('[' + sufixo + ']', C.CINZA)}")).strip().lower()
     except (EOFError, KeyboardInterrupt):
         print()
         return padrao_sim
@@ -2640,6 +2745,8 @@ def acao_reescrever(arquivos=None):
         except OSError:
             antes = None
         marca = _marcar_original(origem, antigo, saida)
+        if marca:
+            _pendentes.append(marca)
 
         args = [bin_extract(), "-r", "-d", pasta_saida]
         if apagar:
@@ -2666,6 +2773,8 @@ def acao_reescrever(arquivos=None):
         # Falha ou interrupção no meio da reescrita: o original ficou como
         # "<nome>.old", e no lugar dele pode haver o ISO novo pela metade.
         # Desfaz o nome (em qualquer pasta de destino).
+        if marca in _pendentes:
+            _pendentes.remove(marca)
         if not r.ok:
             falha, desfeito = _desfazer_reescrita(marca)
             if desfeito:
@@ -3493,6 +3602,7 @@ def mostrar_menu():
 
 
 def main():
+    instalar_sinais()
     carregar_config()
     log_evento("info", "=" * 30)
     log_evento("info", f"Sessão iniciada — {APP_NOME} v{APP_VERSAO}")
@@ -3502,7 +3612,7 @@ def main():
     while True:
         mostrar_menu()
         try:
-            escolha = input(prompt(t("escolha"))).strip().lower()
+            escolha = _ler(prompt(t("escolha"))).strip().lower()
         except EOFError:
             print()
             return EXIT_OK
@@ -3538,6 +3648,8 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
+    except Encerramento as pedido:
+        _sair_pelo_sinal(pedido.sinal)
     except KeyboardInterrupt:
         print()
         print(f"  {EMO['sair']}  {t('ate_logo')}")
