@@ -685,6 +685,11 @@ _ferramenta = None      # a ferramenta externa rodando agora (Popen)
 _encerrar = None        # o sinal de saída recebido, se algum
 _pendentes = []         # reescritas do extract-xiso oficial em andamento
 PRAZO_LIMPEZA = 30      # quanto esperar a ferramenta limpar o que criou
+PRAZO_JANELA = 4        # Windows: o sistema dá 5 s depois de fechar a janela
+# O tratador do console do Windows roda numa thread própria: desfazer uma
+# reescrita é feito por uma thread só de cada vez.
+_trava_pendentes = threading.RLock()
+_tratador_console = None    # o ctypes não guarda a função: ela fica aqui
 
 
 def _forcar_fim(processo):
@@ -736,8 +741,48 @@ def _silenciar_saida():
     sys.stdout = sys.stderr = nulo
 
 
+def _ao_fechar_console(evento):
+    """Windows: a janela foi fechada, a sessão vai sair ou o sistema vai
+    desligar. O Windows avisa cada processo do console e encerra o menu
+    assim que esta função volta; as ferramentas -pt cancelam e apagam o que
+    criaram por conta própria. Aqui o menu espera a ferramenta sair (até
+    PRAZO_JANELA, dentro do prazo do Windows) e desfaz a reescrita pendente
+    do extract-xiso oficial. Ctrl+C e Ctrl+Break seguem para o Python."""
+    global _encerrar
+    if evento not in (2, 5, 6):     # CTRL_CLOSE, CTRL_LOGOFF, CTRL_SHUTDOWN
+        return False
+    try:
+        if _encerrar is None:
+            _encerrar = signal.SIGTERM
+        _silenciar_saida()
+        filho = _ferramenta
+        if filho is not None:
+            try:
+                filho.wait(timeout=PRAZO_JANELA)
+            except subprocess.TimeoutExpired:
+                pass
+        _desfazer_pendentes()
+        log_evento("info", "Sessão encerrada")
+    except Exception:
+        pass
+    return True
+
+
+def _instalar_tratador_console():
+    global _tratador_console
+    try:
+        import ctypes
+        from ctypes import wintypes
+        tipo = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+        _tratador_console = tipo(_ao_fechar_console)
+        ctypes.windll.kernel32.SetConsoleCtrlHandler(_tratador_console, True)
+    except Exception:
+        pass
+
+
 def instalar_sinais():
     if WINDOWS:
+        _instalar_tratador_console()
         return
     signal.signal(signal.SIGTERM, _ao_receber_sinal)
     # Terminal fechado: o mesmo cuidado do SIGTERM. Se o SIGHUP já chega
@@ -749,8 +794,9 @@ def instalar_sinais():
 def _desfazer_pendentes():
     """Desfaz as reescritas do extract-xiso oficial que não terminaram
     (chamado na saída por sinal, que pode pular o caminho normal)."""
-    while _pendentes:
-        _desfazer_reescrita(_pendentes.pop())
+    with _trava_pendentes:
+        while _pendentes:
+            _desfazer_reescrita(_pendentes.pop())
 
 
 def _ler(texto):
@@ -2913,14 +2959,16 @@ def acao_reescrever(arquivos=None):
         # Falha ou interrupção no meio da reescrita: o original ficou como
         # "<nome>.old", e no lugar dele pode haver o ISO novo pela metade.
         # Desfaz o nome (em qualquer pasta de destino).
-        if marca in _pendentes:
-            _pendentes.remove(marca)
-        if not r.ok:
-            falha, desfeito = _desfazer_reescrita(marca)
-            if desfeito:
-                aviso(t("r_original_restaurado"))
-            elif falha is not None:
-                erro("%s %s (%s)" % (t("r_original_em"), antigo, falha))
+        falha, desfeito = None, False
+        with _trava_pendentes:
+            if marca in _pendentes:
+                _pendentes.remove(marca)
+            if not r.ok:
+                falha, desfeito = _desfazer_reescrita(marca)
+        if desfeito:
+            aviso(t("r_original_restaurado"))
+        elif falha is not None:
+            erro("%s %s (%s)" % (t("r_original_em"), antigo, falha))
 
         # O extract-xiso pula ISOs que já estão otimizados e sai com
         # código 0, sem gravar nada.
