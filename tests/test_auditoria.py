@@ -576,6 +576,24 @@ class C1ConfigRegravadoNoLugar(Base):
                          ["config.json", "xiso-manager.log", "xiso_manager.py"])
 
 
+class C2NuloNoConfig(Base):
+    """C-2: um config.json com um caminho com caractere nulo (JSON válido)
+    derrubava o navegador em "Erro inesperado" em toda ação."""
+
+    def test_pasta_padrao_com_nulo(self):
+        self.amb.config(pasta_padrao=str(self.jogos) + "\u0000x")
+        codigo, saida, erros = self.amb.rodar(["3", "0", "0"])
+        self.assertEqual(codigo, 0, erros)
+        self.assertNotIn("Erro inesperado", saida)
+        self.assertNotIn("null", saida)
+
+    def test_caminhos_com_nulo_voltam_ao_padrao(self):
+        xm = carregar_modulo(self.amb)
+        for chave in ("bin_extract_xiso", "bin_iso2god", "pasta_padrao"):
+            self.assertEqual(xm._validar_config(chave, "a\x00b"), xm.CONFIG_PADRAO[chave])
+            self.assertEqual(xm._validar_config(chave, "/a/b"), "/a/b")
+
+
 class E1CtrlCNaConfirmacao(Base):
     """E-1: Ctrl+C em "Confirmar? [S/n]" valia a resposta padrão, "sim": a
     operação começava. Agora vale "não"."""
