@@ -1919,8 +1919,8 @@ def _esperar_ferramenta(processo, prazo=None):
     leitor.start()
     try:
         processo.wait(timeout=PRAZO_LIMPEZA if prazo is None else prazo)
-    except subprocess.TimeoutExpired:
-        _forcar_fim(processo)
+    except (subprocess.TimeoutExpired, KeyboardInterrupt):
+        _forcar_fim(processo)       # passou do prazo, ou segundo Ctrl+C
     leitor.join(timeout=1.0)
 
 
@@ -2051,22 +2051,10 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
             # mesmo console). O iso2god, ao recebê-lo, para e APAGA a saída
             # incompleta: terminar o processo agora interromperia justamente
             # essa limpeza e deixaria um GOD pela metade no destino. Então
-            # primeiro esperamos; só se ele não sair é que forçamos.
-            try:
-                processo.wait(timeout=30)
-            except KeyboardInterrupt:
-                pass            # segundo Ctrl+C: o usuário quer sair já
-            except Exception:
-                pass
-            if processo.poll() is None:
-                try:
-                    processo.terminate()
-                    processo.wait(timeout=5)
-                except Exception:
-                    try:
-                        processo.kill()
-                    except Exception:
-                        pass
+            # primeiro esperamos; só se ele não sair é que forçamos. A espera
+            # esvazia o pipe: sem isso, uma ferramenta que estava imprimindo
+            # ficava presa na escrita, nunca cancelava e morria com SIGKILL.
+            _esperar_ferramenta(processo)
     except Exception as e:
         resultado.erro = f"{t('erro_inesperado')}: {e}"
         log_evento("erro", str(e))

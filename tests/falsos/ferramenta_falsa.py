@@ -276,10 +276,17 @@ def pt_verificar():
 
 
 def pt_listar():
+    """Imprime uma linha por arquivo. Como as -pt, confere o pedido de
+    cancelamento entre uma escrita e outra; presa numa escrita (pipe cheio,
+    ninguém lendo), não tem como conferir."""
     comecou()
     for i in range(PASSOS):
+        if cancelado and PT:
+            anotar("cancelou a listagem")
+            sys.exit(130)
         escrever("arquivo%d.bin\n" % i)
-        time.sleep(PAUSA)
+        if PAUSA:
+            time.sleep(PAUSA)
 
 
 # ── iso2god ─────────────────────────────────────────────────────────────────
