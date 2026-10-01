@@ -419,6 +419,34 @@ class L5InfoJsonInesperado(Base):
         self.assertRegex(saida, r"Sucesso\s+2")
 
 
+PERIGOSOS = ("\x1b", "\x07", "\x9b", "\u202e", "]0;janela")
+
+
+class L6TextoDaIsoCruNoTerminal(Base):
+    """L-6: o título do jogo vem de dentro da ISO; o menu o imprimia cru,
+    com sequências de escape (limpar a tela, trocar o título da janela),
+    controles C1 e inversão de direção do texto."""
+
+    def test_titulo_do_info(self):
+        info = ('{"plataforma_detectada": "xbox360", "titulo": '
+                '"Jogo \\u001b]0;janela\\u0007 \\u001b[2J \\u009b31m \\u202eetxet fim"}')
+        codigo, saida, erros = self.amb.rodar(["2", "c", str(self.iso), "", "0"],
+                                              env={"XMF_INFO": info})
+        linha = [l for l in sem_cor(saida).splitlines() if "Título" in l][0]
+        for p in PERIGOSOS:
+            self.assertNotIn(p, linha)
+        self.assertIn("Jogo", linha)
+        self.assertIn("fim", linha)
+
+    def test_linha_de_saida(self):
+        r, _ = executar_aqui(self, [str(self.amb.bin / "extract-xiso-pt"), "listar", "x.iso"],
+                             {"XMF_SAIDA": "controle", "XMF_PASSOS": "0"})
+        linha = [l for l in r.saida if "título" in l][0]
+        for p in PERIGOSOS:
+            self.assertNotIn(p, linha)
+        self.assertIn("etxet", linha)
+
+
 # ── 4. Configuração e entrada ───────────────────────────────────────────────
 
 class A1NomeQueNaoEhUtf8(Base):
