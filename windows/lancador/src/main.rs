@@ -7,7 +7,7 @@
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use std::io::{self, BufRead, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
 
 #[cfg(windows)]
@@ -40,6 +40,65 @@ fn falhar(mensagem: &str) -> ! {
     exit(1);
 }
 
+/// "python314" para "python314.dll", "python314.zip" ou "python314._pth".
+fn versao_do_nome(nome: &str) -> Option<String> {
+    let nome = nome.to_ascii_lowercase();
+    let (base, extensao) = nome.rsplit_once('.')?;
+    let digitos = base.strip_prefix("python3")?;
+    let versao = !digitos.is_empty() && digitos.bytes().all(|b| b.is_ascii_digit());
+    (versao && matches!(extensao, "dll" | "zip" | "_pth")).then(|| base.to_string())
+}
+
+/// O primeiro arquivo do Python portátil que falta, se faltar algum. Sem a
+/// DLL, a biblioteca padrão ou o `unicodedata` (o menu importa), o Python
+/// cai com "Fatal Python error" e a janela fecha antes de dar para ler: é o
+/// que sobra de uma descompactação pela metade ou de um antivírus que leva
+/// um arquivo para a quarentena. Os nomes levam a versão do Python
+/// (`python314.dll`), que vem do que estiver na pasta; sobras de outra
+/// versão não atrapalham. Uma instalação normal copiada para a pasta
+/// (`Lib\`, `DLLs\`) também serve.
+fn falta_no_python(pasta: &Path) -> Option<PathBuf> {
+    let exe = pasta.join("python.exe");
+    if !exe.is_file() {
+        return Some(exe);
+    }
+    let mut versoes: Vec<String> = std::fs::read_dir(pasta)
+        .map(|itens| {
+            itens
+                .filter_map(|item| item.ok()?.file_name().into_string().ok())
+                .filter_map(|nome| versao_do_nome(&nome))
+                .collect()
+        })
+        .unwrap_or_default();
+    if versoes.is_empty() {
+        return Some(pasta.to_path_buf());
+    }
+    // A versão mais nova primeiro: é dela o arquivo que a mensagem aponta.
+    versoes.sort_by(|a, b| (b.len(), b).cmp(&(a.len(), a)));
+    let faltas: Vec<Option<PathBuf>> = versoes
+        .iter()
+        .map(|versao| {
+            let dll = pasta.join(format!("{versao}.dll"));
+            let zip = pasta.join(format!("{versao}.zip"));
+            if !dll.is_file() {
+                Some(dll)
+            } else if !zip.is_file() && !pasta.join("Lib").is_dir() {
+                Some(zip)
+            } else {
+                None
+            }
+        })
+        .collect();
+    if faltas.iter().all(Option::is_some) {
+        return faltas.into_iter().next().flatten();
+    }
+    let unicodedata = pasta.join("unicodedata.pyd");
+    if !unicodedata.is_file() && !pasta.join("DLLs").join("unicodedata.pyd").is_file() {
+        return Some(unicodedata);
+    }
+    None
+}
+
 fn main() {
     let pasta = std::env::current_exe()
         .ok()
@@ -48,11 +107,11 @@ fn main() {
     let python = pasta.join("python").join("python.exe");
     let script = pasta.join("xiso_manager.py");
 
-    if !python.is_file() {
+    if let Some(falta) = falta_no_python(&pasta.join("python")) {
         falhar(&format!(
             "não achei o Python portátil em {}. Descompacte a pasta inteira do xiso-manager, \
              sem tirar a subpasta \"python\".",
-            python.display()
+            falta.display()
         ));
     }
     if !script.is_file() {
