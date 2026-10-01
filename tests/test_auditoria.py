@@ -396,6 +396,30 @@ class L4MensagemDoVerificarUmaVezSo(Base):
 
 # ── 4. Configuração e entrada ───────────────────────────────────────────────
 
+class A1NomeQueNaoEhUtf8(Base):
+    """A-1: um nome de arquivo gravado em Latin-1 ("Ação" = 41 E7 E3 6F),
+    comum em cópias vindas do Windows. Com o terminal em UTF-8 estrito (o
+    normal num desktop), imprimir o nome derrubava o navegador em "Erro
+    inesperado", toda vez, e o log sujava a tela com "--- Logging error"."""
+
+    def test_navega_seleciona_e_extrai(self):
+        pasta = os.fsencode(self.jogos)
+        os.remove(self.iso)
+        with open(os.path.join(pasta, b"A\xe7\xe3o.iso"), "wb") as f:
+            f.write(ORIGINAL)
+        self.amb.config(pasta_padrao=str(self.jogos))
+        # extrair: o primeiro ISO, destino padrão, sem pular update, confirmar
+        codigo, saida, erros = self.amb.rodar(["3", "1", "", "", "", "", "0"],
+                                              env={"PYTHONIOENCODING": "utf-8"})
+        saida = sem_cor(saida)
+        self.assertEqual(codigo, 0, erros)
+        self.assertNotIn("inesperado", saida)
+        self.assertNotIn("Logging error", erros)
+        self.assertIn("A??o.iso", saida)
+        extraida = os.path.join(pasta, b"A\xe7\xe3o")
+        self.assertTrue(os.path.isdir(extraida), "a extração usou o nome de verdade")
+        self.assertTrue(os.listdir(extraida))
+
 def esperar_texto(processo, texto, prazo=15):
     """Lê a saída do menu até aparecer `texto` (a pergunta em que ele parou)."""
     import select

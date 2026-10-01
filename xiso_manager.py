@@ -63,6 +63,23 @@ def _preparar_console_windows():
 
 _ANSI_WINDOWS = _preparar_console_windows() if WINDOWS else False
 
+
+def _preparar_saida_unix():
+    """Nome de arquivo que não é UTF-8 (Latin-1, de uma cópia do Windows)
+    chega ao Python com "substitutos", que uma saída estrita não sabe
+    escrever: imprimir o nome derrubava a tela inteira. Como no Windows, o
+    que não dá para escrever vira "?"; o resto sai igual."""
+    for fluxo in (sys.stdout, sys.stderr):
+        try:
+            if getattr(fluxo, "errors", "") == "strict":
+                fluxo.reconfigure(errors="replace")
+        except Exception:
+            pass
+
+
+if not WINDOWS:
+    _preparar_saida_unix()
+
 EXIT_OK = 0
 EXIT_ERRO = 1
 EXIT_INTERROMPIDO = 130
@@ -203,13 +220,21 @@ except Exception:
     pass
 
 _log_ok = True
+_FORMATO_LOG = dict(
+    filename=str(ARQ_LOG),
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 try:
-    logging.basicConfig(
-        filename=str(ARQ_LOG),
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    # O que não couber na codificação do arquivo (um nome que não é UTF-8)
+    # vira \xNN, em vez de o logging despejar um traceback na tela.
+    logging.basicConfig(errors="backslashreplace", **_FORMATO_LOG)
+except (TypeError, ValueError):     # Python anterior ao 3.9, sem `errors`
+    try:
+        logging.basicConfig(**_FORMATO_LOG)
+    except Exception:
+        _log_ok = False
 except Exception:
     _log_ok = False
 
