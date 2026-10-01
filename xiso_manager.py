@@ -1647,8 +1647,8 @@ def iso2god_proprio(binario=None):
     binario = binario or bin_god()
     if binario not in _ISO2GOD_PROPRIO:
         try:
-            ajuda = subprocess.run([binario, "--help"], capture_output=True,
-                                   text=True, timeout=10).stdout
+            ajuda = subprocess.run([binario, "--help"], stdin=subprocess.DEVNULL,
+                                   capture_output=True, text=True, timeout=10).stdout
         except Exception:
             ajuda = ""
         _ISO2GOD_PROPRIO[binario] = "converter" in ajuda and "info" in ajuda
@@ -2046,7 +2046,8 @@ def executar(cmd, label, emoji="", destino=None, total=0, mostrar_saida=True,
 
     global _ferramenta
     try:
-        processo = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+        # A entrada é o teclado do menu: a ferramenta não a disputa com ele.
+        processo = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, bufsize=0)
         _ferramenta = processo
         # O verificar --progresso-json do extract-xiso-pt manda o erro duas
@@ -3269,7 +3270,8 @@ def mostrar_info_iso2god(arquivo):
     cmd = [bin_god(), "info", "--json", arquivo]
     log_evento("info", "cmd: " + " ".join(cmd))
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        r = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True,
+                           text=True, timeout=300)
     except Exception as e:
         erro(str(e))
         return False
