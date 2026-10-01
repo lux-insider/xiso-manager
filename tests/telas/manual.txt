@@ -1,0 +1,103 @@
+
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💿  xiso-manager  ·  v3.2.5                                    │
+╰────────────────────────────────────────────────────────────────╯
+
+  ● iso2god         pronto
+  ● extract-xiso-pt pronto
+
+──────────────────────────────────────────────────────────────────
+
+  ── Xbox 360 ───────────────────────────────────────── iso2god ──
+   [1]  🎮  Converter ISO para GOD
+   [2]  🔍  Analisar ISO sem converter
+
+  ── Os dois consoles ───────────────────────── extract-xiso-pt ──
+   [3]  📦  Extrair conteúdo de ISO
+   [4]  📋  Listar arquivos dentro do ISO
+   [5]  🛠️  Criar ISO a partir de uma pasta
+   [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
+
+  ── Geral ───────────────────────────────────────────────────────
+   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
+   [8]  🚀  Lote: processar uma pasta inteira
+   [9]  ⌨️  Comando manual (avançado)
+
+  ── Sistema ─────────────────────────────────────────────────────
+   [c]  ⚙️  Configurações
+   [l]  🧾  Ver log de execução
+   [s]  📖  Sobre / ajuda
+
+   [0]  🚪  Sair
+
+──────────────────────────────────────────────────────────────────
+
+  ▸ Escolha uma opção:
+
+╭────────────────────────────────────────────────────────────────╮
+│ ⌨️  Comando manual (avançado)                                  │
+╰────────────────────────────────────────────────────────────────╯
+
+  Passe os argumentos direto para o binário, como no terminal.
+   [1]  📦  extract-xiso-pt
+   [2]  🎮  iso2god
+   [0]  🚪  Voltar
+
+  ▸ Escolha uma opção:
+  💡  converter -j 4 --padding parcial jogo.iso ~/GOD
+
+  ▸ Argumentos:
+    └ {"tipo_disco": "Xgd3", "plataforma_detectada": "xbox360",…
+  ✓  Executando       concluído em <T>
+
+╭────────────────────────────────────────────────────────────────╮
+│ ✅  RESUMO — Comando manual (avançado)                         │
+╰────────────────────────────────────────────────────────────────╯
+
+  ✓  Sucesso          1
+  ✓  Falhas           0
+  ⏱️ Tempo            <T>
+
+  Log completo em: <BASE>/app/xiso-manager.log
+
+  ▸ Pressione ENTER para continuar
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💿  xiso-manager  ·  v3.2.5                                    │
+╰────────────────────────────────────────────────────────────────╯
+
+  ● iso2god         pronto
+  ● extract-xiso-pt pronto
+
+──────────────────────────────────────────────────────────────────
+
+  ── Xbox 360 ───────────────────────────────────────── iso2god ──
+   [1]  🎮  Converter ISO para GOD
+   [2]  🔍  Analisar ISO sem converter
+
+  ── Os dois consoles ───────────────────────── extract-xiso-pt ──
+   [3]  📦  Extrair conteúdo de ISO
+   [4]  📋  Listar arquivos dentro do ISO
+   [5]  🛠️  Criar ISO a partir de uma pasta
+   [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
+
+  ── Geral ───────────────────────────────────────────────────────
+   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
+   [8]  🚀  Lote: processar uma pasta inteira
+   [9]  ⌨️  Comando manual (avançado)
+
+  ── Sistema ─────────────────────────────────────────────────────
+   [c]  ⚙️  Configurações
+   [l]  🧾  Ver log de execução
+   [s]  📖  Sobre / ajuda
+
+   [0]  🚪  Sair
+
+──────────────────────────────────────────────────────────────────
+
+  ▸ Escolha uma opção:
+  🚪  Até logo! Valeu por usar o XISO Manager.
+

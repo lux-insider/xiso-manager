@@ -1,0 +1,145 @@
+
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💿  xiso-manager  ·  v3.2.5                                    │
+╰────────────────────────────────────────────────────────────────╯
+
+  ● iso2god         pronto
+  ● extract-xiso-pt pronto
+
+──────────────────────────────────────────────────────────────────
+
+  ── Xbox 360 ───────────────────────────────────────── iso2god ──
+   [1]  🎮  Converter ISO para GOD
+   [2]  🔍  Analisar ISO sem converter
+
+  ── Os dois consoles ───────────────────────── extract-xiso-pt ──
+   [3]  📦  Extrair conteúdo de ISO
+   [4]  📋  Listar arquivos dentro do ISO
+   [5]  🛠️  Criar ISO a partir de uma pasta
+   [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
+
+  ── Geral ───────────────────────────────────────────────────────
+   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
+   [8]  🚀  Lote: processar uma pasta inteira
+   [9]  ⌨️  Comando manual (avançado)
+
+  ── Sistema ─────────────────────────────────────────────────────
+   [c]  ⚙️  Configurações
+   [l]  🧾  Ver log de execução
+   [s]  📖  Sobre / ajuda
+
+   [0]  🚪  Sair
+
+──────────────────────────────────────────────────────────────────
+
+  ▸ Escolha uma opção:
+
+╭────────────────────────────────────────────────────────────────╮
+│ 🔄  Reescrever / otimizar ISO                                  │
+╰────────────────────────────────────────────────────────────────╯
+
+  Reorganiza o ISO deixando ele otimizado e menor.
+
+
+╭────────────────────────────────────────────────────────────────╮
+│ 📁  SELECIONAR ARQUIVO                                         │
+╰────────────────────────────────────────────────────────────────╯
+
+  📁 Pasta atual   <BASE>/jogos
+
+  #  ARQUIVO                TAMANHO  CONSOLE
+  ──────────────────────────────────────────
+  1  📄  Halo.iso          0.05 MiB  ?
+  2  📄  Jogo de Ação.iso  0.01 MiB  ?
+
+  [..]  ⬆️  Subir um nível
+   [c]  ⌨️  Digitar um caminho
+   [t]  🚀  Selecionar TODOS os ISOs desta pasta
+   [0]  🚪  Voltar
+
+  Números separados por vírgula (ex: 1,3,5) ou intervalo (1-4)
+
+  ▸ Escolha uma opção:
+  ── 1/4 · Seleção ───────────────────────────────────────────────
+  #  ARQUIVO        TAMANHO  CONSOLE
+  ──────────────────────────────────
+  1  📄  Halo.iso  0.05 MiB  ?
+
+  📊 total         1 arquivo(s) selecionado(s)  0.05 MiB
+
+  ── 2/4 · Destino ───────────────────────────────────────────────
+
+  ▸ Pasta de destino (ENTER = padrão):     └ (padrão)
+
+  ── 3/4 · Opções ────────────────────────────────────────────────
+
+  ▸ Apagar o ISO antigo depois de reescrever? [s/N]:
+  ── 4/4 · Verificação ───────────────────────────────────────────
+  📁 Destino       <BASE>/jogos
+  📦 Necessário    0.05 MiB  (com margem: 0.06 MiB)
+  💾 Disponível    ##.## GiB   Total: ###.## GiB
+  📊 Uso atual     <BARRA> ##.#%
+  ✓  Espaço suficiente.
+
+  ▸ Confirmar? [S/n]:
+  ── Execução ────────────────────────────────────────────────────
+  Otimizando concluído: 0.05 MiB em <T> (<V>)
+    ├ reescrevendo
+    └ Gravado. <BASE>/jogos/Halo.xiso.iso
+  ✓  Otimizando       concluído em <T>
+
+╭────────────────────────────────────────────────────────────────╮
+│ ✅  RESUMO — Reescrever / otimizar ISO                         │
+╰────────────────────────────────────────────────────────────────╯
+
+  ✓  Sucesso          1
+  ✓  Falhas           0
+  ⏱️ Tempo            <T>
+  🗑️ Apagar o ISO antigo depois de reescrever? não
+
+  Arquivos gerados
+    📄 <BASE>/jogos/Halo.xiso.iso  0.05 MiB
+
+  Log completo em: <BASE>/app/xiso-manager.log
+
+  ▸ Pressione ENTER para continuar
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💿  xiso-manager  ·  v3.2.5                                    │
+╰────────────────────────────────────────────────────────────────╯
+
+  ● iso2god         pronto
+  ● extract-xiso-pt pronto
+
+──────────────────────────────────────────────────────────────────
+
+  ── Xbox 360 ───────────────────────────────────────── iso2god ──
+   [1]  🎮  Converter ISO para GOD
+   [2]  🔍  Analisar ISO sem converter
+
+  ── Os dois consoles ───────────────────────── extract-xiso-pt ──
+   [3]  📦  Extrair conteúdo de ISO
+   [4]  📋  Listar arquivos dentro do ISO
+   [5]  🛠️  Criar ISO a partir de uma pasta
+   [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
+
+  ── Geral ───────────────────────────────────────────────────────
+   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
+   [8]  🚀  Lote: processar uma pasta inteira
+   [9]  ⌨️  Comando manual (avançado)
+
+  ── Sistema ─────────────────────────────────────────────────────
+   [c]  ⚙️  Configurações
+   [l]  🧾  Ver log de execução
+   [s]  📖  Sobre / ajuda
+
+   [0]  🚪  Sair
+
+──────────────────────────────────────────────────────────────────
+
+  ▸ Escolha uma opção:
+  🚪  Até logo! Valeu por usar o XISO Manager.
+

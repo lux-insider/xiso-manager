@@ -1,0 +1,122 @@
+
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💿  xiso-manager  ·  v3.2.5                                    │
+╰────────────────────────────────────────────────────────────────╯
+
+  ● iso2god         pronto
+  ● extract-xiso-pt pronto
+
+──────────────────────────────────────────────────────────────────
+
+  ── Xbox 360 ───────────────────────────────────────── iso2god ──
+   [1]  🎮  Converter ISO para GOD
+   [2]  🔍  Analisar ISO sem converter
+
+  ── Os dois consoles ───────────────────────── extract-xiso-pt ──
+   [3]  📦  Extrair conteúdo de ISO
+   [4]  📋  Listar arquivos dentro do ISO
+   [5]  🛠️  Criar ISO a partir de uma pasta
+   [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
+
+  ── Geral ───────────────────────────────────────────────────────
+   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
+   [8]  🚀  Lote: processar uma pasta inteira
+   [9]  ⌨️  Comando manual (avançado)
+
+  ── Sistema ─────────────────────────────────────────────────────
+   [c]  ⚙️  Configurações
+   [l]  🧾  Ver log de execução
+   [s]  📖  Sobre / ajuda
+
+   [0]  🚪  Sair
+
+──────────────────────────────────────────────────────────────────
+
+  ▸ Escolha uma opção:
+
+╭────────────────────────────────────────────────────────────────╮
+│ 🛠️  Criar ISO a partir de uma pasta                            │
+╰────────────────────────────────────────────────────────────────╯
+
+  Monta um ISO novo a partir de uma pasta com os arquivos do jogo.
+
+  ── 1/4 · Origem ────────────────────────────────────────────────
+
+  ▸ Pasta de origem com os arquivos do jogo:     └ pasta-do-jogo · 2 arquivos · 0.01 MiB
+
+  ▸ Adicionar outra pasta nesta mesma execução? [s/N]:
+  ── 2/4 · Destino ───────────────────────────────────────────────
+
+  ▸ Nome/caminho do ISO de saída (ENTER = automático) (pasta-do-jogo.iso):     └ <BASE>/trabalho/pasta-do-jogo.iso
+
+  ── 3/4 · Opções ────────────────────────────────────────────────
+
+  ▸ Liberar o default.xbe para rodar de qualquer mídia (HD, DVD gravado)? Muda só a cópia no ISO novo [s/N]:
+  ── 4/4 · Verificação ───────────────────────────────────────────
+  📁 Destino       <BASE>/trabalho
+  📦 Necessário    0.01 MiB  (com margem: 0.01 MiB)
+  💾 Disponível    ##.## GiB   Total: ###.## GiB
+  📊 Uso atual     <BARRA> ##.#%
+  ✓  Espaço suficiente.
+
+  ▸ Confirmar? [S/n]:
+  ── Execução ────────────────────────────────────────────────────
+  Criando imagem concluído: 0.01 MiB em <T> (<V>)
+    ├ criando
+    └ Gravado. <BASE>/trabalho/pasta-do-jogo.iso
+  ✓  Criando imagem   concluído em <T>
+
+╭────────────────────────────────────────────────────────────────╮
+│ ✅  RESUMO — Criar ISO a partir de uma pasta                   │
+╰────────────────────────────────────────────────────────────────╯
+
+  ✓  Sucesso          1
+  ✓  Falhas           0
+  ⏱️ Tempo            <T>
+
+  Arquivos gerados
+    📄 <BASE>/trabalho/pasta-do-jogo.iso  0.01 MiB
+
+  Log completo em: <BASE>/app/xiso-manager.log
+
+  ▸ Pressione ENTER para continuar
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💿  xiso-manager  ·  v3.2.5                                    │
+╰────────────────────────────────────────────────────────────────╯
+
+  ● iso2god         pronto
+  ● extract-xiso-pt pronto
+
+──────────────────────────────────────────────────────────────────
+
+  ── Xbox 360 ───────────────────────────────────────── iso2god ──
+   [1]  🎮  Converter ISO para GOD
+   [2]  🔍  Analisar ISO sem converter
+
+  ── Os dois consoles ───────────────────────── extract-xiso-pt ──
+   [3]  📦  Extrair conteúdo de ISO
+   [4]  📋  Listar arquivos dentro do ISO
+   [5]  🛠️  Criar ISO a partir de uma pasta
+   [6]  🔄  Reescrever / otimizar ISO
+   [v]  🔍  Verificar integridade do ISO
+
+  ── Geral ───────────────────────────────────────────────────────
+   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
+   [8]  🚀  Lote: processar uma pasta inteira
+   [9]  ⌨️  Comando manual (avançado)
+
+  ── Sistema ─────────────────────────────────────────────────────
+   [c]  ⚙️  Configurações
+   [l]  🧾  Ver log de execução
+   [s]  📖  Sobre / ajuda
+
+   [0]  🚪  Sair
+
+──────────────────────────────────────────────────────────────────
+
+  ▸ Escolha uma opção:
+  🚪  Até logo! Valeu por usar o XISO Manager.
+
