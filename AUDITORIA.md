@@ -90,9 +90,9 @@ vetar se discordar.
 | W-2 | Média | `xiso_manager.py:1650, 3273` | a saída do `info --json` é lida na codificação padrão do sistema: rodando o `.py` direto no Windows, o título "Jogo de Ação" vira "Jogo de AÃ§Ã£o"; num Linux com `LANG=C`, a análise falha | corrigido (achado pelo CI no Windows) |
 | W-3 | Baixa | `xiso_manager.py:241-258` | o log é gravado na codificação padrão do sistema e lido como UTF-8: rodando o `.py` direto no Windows, "Ver log" mostra "Sess�o iniciada" | corrigido (achado pelo CI no Windows) |
 | V-1 | Média | `xiso_manager.py:2997-3006` | assistente com o extract-xiso oficial: ISO de Xbox clássico cai em "Não consegui identificar" | **só descrito** (muda a tela) |
-| V-2 | Média | `xiso_manager.py:2326, 2490, 2596` | o extract-xiso oficial grava por cima sem perguntar (extrair, criar, reescrever para outra pasta) | **só descrito** (pergunta nova) |
+| V-2 | Média | `xiso_manager.py:2326, 2490, 2596` | o extract-xiso oficial grava por cima sem perguntar (extrair, criar, reescrever para outra pasta) | corrigido depois (pedido) |
 | V-3 | Baixa | `xiso_manager.py:1916-1918, 1930-1932` | Ctrl+C nas outras perguntas devolve a resposta padrão e o fluxo segue | **só descrito** (muda o fluxo) |
-| V-4 | Baixa | `windows/lancador/src/main.rs:69-75` | erro fatal do programa (código 1) no Windows: a janela fecha antes de dar para ler | **só descrito** (pausa nova) |
+| V-4 | Baixa | `windows/lancador/src/main.rs:69-75` | erro fatal do programa (código 1) no Windows: a janela fecha antes de dar para ler | corrigido depois (pedido) |
 | V-5 | Baixa | `xiso_manager.py:141-158` | `config.json` ilegível vira o padrão sem aviso e é regravado na próxima mudança | **só descrito** (aviso novo) |
 | V-6 | Baixa | — | Windows: `taskkill /F` no menu deixa a ferramenta órfã | **só descrito** |
 | D-1 | — | pacote Windows | o Python portátil poderia encolher de 24,6 MB para 8,7 MB | **só descrito** (pedido) |
@@ -521,6 +521,16 @@ ISO de origem, mas pode levar outra cópia que o usuário tinha no destino. A
 correção é fazer as mesmas perguntas no caminho do oficial, o que é uma
 pergunta nova nesse fluxo.
 
+*Corrigido depois, a pedido* (`xiso_manager.py:2637, 2801, 2965`): as
+mesmas perguntas, com os mesmos textos e o mesmo padrão "não", valem agora
+para as duas ferramentas. Com "não", o item é pulado ("pulado") e a
+ferramenta nem roda; com "sim", o oficial grava por cima como sempre fez.
+Na reescrita, a pergunta só aparece com o destino em outra pasta: na mesma
+pasta (por qualquer caminho, `_mesma_pasta`), o nome no destino é o do
+próprio original, que o oficial renomeia para `.old` antes de gravar. Um
+`.old` que já exista não precisa de pergunta: o oficial se recusa a
+reescrever (`extract-xiso.c:810`).
+
 ### V-3 (Baixa) — Ctrl+C nas outras perguntas
 
 `xiso_manager.py:1916-1918, 1930-1932`. Fora da confirmação final (E-1), o
@@ -536,6 +546,17 @@ nada sozinho, porque a confirmação final agora vale "não" no Ctrl+C, mas não
 (código 1, "❌ <motivo>"), a janela aberta com dois cliques fecha na hora. A
 correção seria esperar ENTER quando o código for 1 e o console for só do
 lançador (`GetConsoleProcessList`); é uma pausa nova.
+
+*Corrigido depois, a pedido* (`windows/lancador/src/main.rs:37, 58, 165`):
+quando o programa termina com erro e o console é só do lançador (aberto com
+dois cliques), ele mostra "Aperte ENTER para fechar...", a mesma linha de
+quando falta um arquivo do Python, e espera. Vale também para uma queda do
+Python com outro código, que antes fechava a janela sem mensagem nenhuma;
+nesse caso vem antes "xiso-manager: o Python fechou com erro (código
+0x…)". Saída normal (0) e Ctrl+C (130, ou o `STATUS_CONTROL_C_EXIT` do
+Windows) fecham na hora. Na pausa, o Ctrl+C também fecha. Num terminal
+aberto antes (`cmd`, PowerShell), o console tem outros processos e a janela
+não fecha: não há pausa.
 
 ### V-5 (Baixa) — config.json ilegível
 
@@ -557,6 +578,10 @@ Nenhum texto novo, nenhuma opção, tecla ou pergunta nova. Das 20 telas
 gravadas, só a do verificar com erro mudou (L-4, pedido). O que muda é
 **quando** algumas mensagens que já existiam aparecem, sempre num caso que
 antes dava errado. Se discordar de alguma, é só dizer qual.
+
+Depois, a pedido, o V-2 e o V-4: uma pergunta e uma pausa que já existiam
+passam a aparecer em mais casos, e o lançador ganhou uma linha nova, só para
+uma queda do Python (as duas últimas linhas da tabela).
 
 | Item | Caso | Antes | Agora |
 |---|---|---|---|
@@ -583,6 +608,8 @@ antes dava errado. Se discordar de alguma, é só dizer qual.
 | LZ-1 | falta a DLL, a biblioteca padrão ou o `unicodedata.pyd` | "Fatal Python error" e a janela fechando | a mensagem que já existia para o `python.exe` faltando, com o caminho do arquivo que falta, esperando ENTER |
 | C-1 | o menu morre no meio de uma gravação do config | o `config.json` pela metade | o `config.json` de antes; pode sobrar um `config.json.tmp` ao lado, que a próxima gravação reaproveita |
 | W-1 | janela fechada no Windows | — | nada (a janela já fechou) |
+| V-2 | extrair, criar ou reescrever para outra pasta com o extract-xiso oficial, com o destino já ocupado | gravava por cima, sem perguntar | "… já tem arquivos. Extrair por cima?" ou "… já existe. Substituir?", como com o extract-xiso-pt; com "não", "pulado" |
+| V-4 | erro fatal do programa com a janela aberta com dois cliques | a janela fechava na hora | "Aperte ENTER para fechar..."; numa queda do Python, antes disso, "xiso-manager: o Python fechou com erro (código 0x…)." |
 
 ## Resultado da fase 2
 
@@ -639,3 +666,21 @@ Windows:
 
 A primeira execução no Windows achou W-2 e W-3, que só aparecem fora do
 modo UTF-8 e por isso não apareciam no pacote nem no Linux comum.
+
+## V-2 e V-4, corrigidos depois
+
+A pedido, os dois itens que mais pesavam entre os só descritos:
+
+- **V-2:** 7 testes novos (`V2OficialPerguntaAntesDeGravarPorCima`): para
+  extrair, criar e reescrever para outra pasta com o extract-xiso oficial e
+  o destino ocupado, a pergunta aparece e o "não" deixa o arquivo do
+  usuário intacto, sem rodar a ferramenta; o "sim" grava por cima; e a
+  reescrita na mesma pasta digitada por outro caminho (um link) não
+  pergunta. Os 3 de pergunta falham na 3.2.7. A ferramenta falsa passou a
+  imitar também o `-c` do oficial (o caminho de saída e o `O_TRUNC` do
+  `create_xiso`). As telas gravadas não mudaram.
+- **V-4:** 3 testes da decisão no lançador (`cargo test`) e 3 no pacote de
+  verdade, no Windows (`tests/test_pacote_windows.py`), com o lançador num
+  console próprio, como aberto com dois cliques: com erro, ele espera o
+  ENTER e sai com 1; com 0 e 130, fecha na hora; rodado de dentro de um
+  `cmd.exe`, não espera.
