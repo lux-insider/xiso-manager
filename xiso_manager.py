@@ -3410,9 +3410,6 @@ def acao_assistente():
                 (EMO["extrair"], t("m_extrair"), t("d_extrair"), lambda: acao_extrair(arquivos)),
                 (EMO["otimizar"], t("m_reescrever"), t("d_reescrever"), lambda: acao_reescrever(arquivos)),
             ]
-    if eh_pt() and tipo in ("xbox", "xbox360"):
-        escolhas.append((EMO["analisar"], t("m_verificar"), t("d_verificar"),
-                         lambda: acao_verificar(arquivos)))
     else:
         dica(t("sug_nada"))
         escolhas = [
@@ -3420,6 +3417,10 @@ def acao_assistente():
             (EMO["listar"], t("m_listar"), t("d_listar"), lambda: acao_listar(arquivos)),
             (EMO["god"], t("m_god"), t("d_god"), lambda: acao_god(arquivos)),
         ]
+    # o verificar é do extract-xiso-pt; o oficial não tem
+    if eh_pt() and tipo in ("xbox", "xbox360"):
+        escolhas.append((EMO["analisar"], t("m_verificar"), t("d_verificar"),
+                         lambda: acao_verificar(arquivos)))
 
     print()
     print(cor(f"  {t('acoes_sugeridas')}", C.NEG, C.BRANC))

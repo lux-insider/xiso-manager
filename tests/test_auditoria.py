@@ -168,6 +168,32 @@ class R3OficialInterrompido(Base):
         self.assertEqual(outro.read_bytes(), b"OUTRO ARQUIVO")
 
 
+class V1AssistenteComOOficial(Base):
+    """V-1: com o extract-xiso oficial, o assistente mostrava a dica certa
+    para uma ISO de Xbox clássico e logo depois "Não consegui identificar",
+    com a lista genérica de ações no lugar da certa."""
+
+    oficial = True
+
+    def test_xbox_classico_tem_as_acoes_certas(self):
+        # a assinatura do XDVDFS no setor 32, como numa XISO
+        iso = self.amb.iso("Jogo.iso", b"\0" * 0x10000 + b"MICROSOFT*XBOX*MEDIA" + b"\0" * 4096,
+                           pasta=self.jogos)
+        codigo, saida, erros = self.amb.rodar(["7", "c", str(iso), "0", "0"])
+        self.assertEqual(codigo, 0, erros)
+        saida = sem_cor(saida)
+        self.assertIn("Este ISO é do Xbox clássico. Use extrair, listar ou reescrever.", saida)
+        self.assertNotIn("Não consegui identificar", saida)
+        self.assertIn("Ações disponíveis para este arquivo", saida)
+        acoes = saida.split("Ações disponíveis para este arquivo", 1)[1].split("[ENTER]", 1)[0]
+        for acao in ("Extrair conteúdo de ISO", "Listar arquivos dentro do ISO",
+                     "Reescrever / otimizar ISO"):
+            self.assertIn(acao, acoes)
+        self.assertNotIn("Converter ISO para GOD", acoes)
+        # o verificar é só do extract-xiso-pt
+        self.assertNotIn("Verificar integridade do ISO", acoes)
+
+
 class V2OficialPerguntaAntesDeGravarPorCima(Base):
     """V-2: o extract-xiso oficial grava por cima do que já está no destino,
     sem perguntar (O_TRUNC). Com o extract-xiso-pt o menu perguntava antes;
