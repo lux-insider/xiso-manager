@@ -87,6 +87,8 @@ vetar se discordar.
 | C-2 | Baixa | `xiso_manager.py:116-138, 2045` | um caminho com caractere nulo no `config.json` derruba o navegador | corrigido |
 | E-3 | Baixa | `xiso_manager.py:1987, 1995, 3027, 3098` | dígitos que não são 0-9 (`²`, `³`) ou um número de milhares de algarismos na escolha viram "Erro inesperado" | corrigido |
 | P-4 | Baixa | `xiso_manager.py:1787` | a ferramenta herda a entrada do terminal e pode disputar o teclado com o menu | corrigido |
+| W-2 | Média | `xiso_manager.py:1650, 3273` | a saída do `info --json` é lida na codificação padrão do sistema: rodando o `.py` direto no Windows, o título "Jogo de Ação" vira "Jogo de AÃ§Ã£o"; num Linux com `LANG=C`, a análise falha | corrigido (achado pelo CI no Windows) |
+| W-3 | Baixa | `xiso_manager.py:241-258` | o log é gravado na codificação padrão do sistema e lido como UTF-8: rodando o `.py` direto no Windows, "Ver log" mostra "Sess�o iniciada" | corrigido (achado pelo CI no Windows) |
 | V-1 | Média | `xiso_manager.py:2997-3006` | assistente com o extract-xiso oficial: ISO de Xbox clássico cai em "Não consegui identificar" | **só descrito** (muda a tela) |
 | V-2 | Média | `xiso_manager.py:2326, 2490, 2596` | o extract-xiso oficial grava por cima sem perguntar (extrair, criar, reescrever para outra pasta) | **só descrito** (pergunta nova) |
 | V-3 | Baixa | `xiso_manager.py:1916-1918, 1930-1932` | Ctrl+C nas outras perguntas devolve a resposta padrão e o fluxo segue | **só descrito** (muda o fluxo) |
@@ -322,6 +324,17 @@ tira as sequências de escape inteiras, os controles C1 e os de direção do
 texto; os valores do `info --json` e o texto dos eventos passam pela mesma
 limpeza, sem mexer nos espaços (as telas gravadas não mudam).
 
+### W-2 (Média) — saída do `info --json` na codificação do sistema
+
+`xiso_manager.py:1650, 3273` (linhas da 3.2.6). O iso2god escreve em UTF-8,
+mas o menu lia o `info --json` (e o `--help`) com `text=True`, que usa a
+codificação padrão do sistema. O pacote do Windows escapa porque o lançador
+roda o Python com `-X utf8`; quem roda o `xiso_manager.py` direto no Windows
+(cp1252) via "Jogo de AÃ§Ã£o" no título, e num Linux com `LANG=C` (ASCII) a
+análise falhava com "'ascii' codec can't decode". Achado pelo GitHub
+Actions no Windows. *Correção:* ler essas saídas como UTF-8, trocando o que
+não for UTF-8 por "�", como a leitura das outras ferramentas já fazia.
+
 ## 4. Configuração e entrada
 
 ### E-1 (Alta) — Ctrl+C em "Confirmar? [S/n]" confirma
@@ -379,6 +392,16 @@ o de verdade, e o link continua. O formato do arquivo não muda.
 "a\u0000b"` (JSON válido) faz o navegador cair em "Erro inesperado:
 embedded null byte" em toda ação. *Correção:* `_validar_config` recusa
 caminhos com caractere nulo, como já recusa tipo errado.
+
+### W-3 (Baixa) — log na codificação do sistema
+
+`xiso_manager.py:241-258` (linhas da 3.2.6). O log era gravado na
+codificação padrão do sistema, e a tela "Ver log" o lê como UTF-8: fora do
+modo UTF-8 (o `.py` rodado direto no Windows), "Sessão iniciada" aparecia
+como "Sess�o iniciada"; num Linux com `LANG=C`, como "Sess\xe3o iniciada".
+Achado pelo GitHub Actions no Windows. *Correção:* o log é sempre gravado
+em UTF-8, como no Linux comum e no pacote do Windows. O formato das linhas
+não muda.
 
 ### Verificado e sem problema
 
@@ -555,6 +578,8 @@ antes dava errado. Se discordar de alguma, é só dizer qual.
 | C-2 | caminho com caractere nulo no `config.json` | "Erro inesperado: embedded null byte" em toda ação | o valor padrão (a pasta pessoal; as ferramentas procuradas de novo) |
 | P-3 | Ctrl+C no meio de uma saída grande | 35 s parado, e a ferramenta morta sem limpar | o cancelamento na hora, com limpeza |
 | P-4 | ferramenta que lê o teclado (comando manual) | esperava com a barra parada e pegava o que se digitava para o menu | recebe "fim da entrada" na hora |
+| W-2 | título com acento no `info --json`, com o `.py` rodado direto no Windows | "Jogo de AÃ§Ã£o" | "Jogo de Ação" |
+| W-3 | "Ver log", com o `.py` rodado direto no Windows | "Sess�o iniciada" | "Sessão iniciada" (as linhas gravadas antes continuam como estavam) |
 | LZ-1 | falta a DLL, a biblioteca padrão ou o `unicodedata.pyd` | "Fatal Python error" e a janela fechando | a mensagem que já existia para o `python.exe` faltando, com o caminho do arquivo que falta, esperando ENTER |
 | C-1 | o menu morre no meio de uma gravação do config | o `config.json` pela metade | o `config.json` de antes; pode sobrar um `config.json.tmp` ao lado, que a próxima gravação reaproveita |
 | W-1 | janela fechada no Windows | — | nada (a janela já fechou) |
@@ -588,3 +613,29 @@ falha no código antigo e passa no novo.
   o mesmo código no Linux. Antes de publicar, vale fechar a janela no meio
   de uma reescrita com o extract-xiso oficial num Windows de verdade e
   conferir que o original volta ao nome.
+
+## Testes no Windows (GitHub Actions)
+
+Depois da fase 2, o workflow `.github/workflows/testes.yml` passou a rodar
+os testes a cada push na `main` e em todo pull request, no Linux e no
+Windows:
+
+- **Menu:** a suíte inteira no Linux (Python 3.10 e 3.14) e no Windows
+  (3.8, o mais antigo que o README promete, e 3.14, o do pacote). No
+  Windows as ferramentas falsas são arquivos `.cmd`; o que depende dos
+  sinais do Unix, do pty, do módulo `resource` ou de nomes que não são
+  UTF-8 é pulado lá, com o motivo. As 19 telas sem cor valem nos dois.
+- **W-1 de verdade:** o menu num console próprio (um pseudoconsole, o mesmo
+  do Windows Terminal), no meio de uma reescrita com o extract-xiso oficial;
+  o console é fechado e o Windows manda `CTRL_CLOSE_EVENT` ao menu e à
+  ferramenta. O original tem que voltar ao nome. Também o tratador
+  registrado de verdade com `SetConsoleCtrlHandler`.
+- **Lançador:** formatação, clippy, testes e compilação de release com o
+  linker da Microsoft.
+- **Pacote:** o lançador compilado e o Python portátil oficial (versão e
+  SHA-256 fixados no workflow), numa pasta com espaço e acento: o menu abre
+  e sai, e faltando a biblioteca padrão, a DLL, o `unicodedata.pyd` ou o
+  `python.exe` sai a mensagem do lançador.
+
+A primeira execução no Windows achou W-2 e W-3, que só aparecem fora do
+modo UTF-8 e por isso não apareciam no pacote nem no Linux comum.
