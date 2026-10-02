@@ -776,5 +776,18 @@ class W2InfoEmUtf8(Base):
         self.assertIn("Jogo de Ação", sem_cor(saida))
 
 
+class W3LogEmUtf8(Base):
+    """W-3: o log era gravado na codificação padrão do sistema e lido como
+    UTF-8 na tela "Ver log": fora do modo UTF-8 (o .py rodado direto no
+    Windows), "Sessão iniciada" aparecia como "Sess�o iniciada"."""
+
+    def test_log_em_utf8(self):
+        codigo, saida, erros = self.amb.rodar(["l", "", "0"], env=SEM_UTF8)
+        self.assertEqual(codigo, 0, erros)
+        log = (self.amb.app / "xiso-manager.log").read_bytes().decode("utf-8")
+        self.assertIn("Sessão iniciada", log)
+        self.assertIn("Sessão iniciada", sem_cor(saida))
+
+
 if __name__ == "__main__":
     unittest.main()

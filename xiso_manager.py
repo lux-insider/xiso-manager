@@ -239,21 +239,19 @@ except Exception:
     pass
 
 _log_ok = True
-_FORMATO_LOG = dict(
-    filename=str(ARQ_LOG),
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
 try:
-    # O que não couber na codificação do arquivo (um nome que não é UTF-8)
-    # vira \xNN, em vez de o logging despejar um traceback na tela.
-    logging.basicConfig(errors="backslashreplace", **_FORMATO_LOG)
-except (TypeError, ValueError):     # Python anterior ao 3.9, sem `errors`
+    # Sempre em UTF-8, que é como a tela "Ver log" o lê: na codificação padrão
+    # do sistema (cp1252 no Windows, fora do modo UTF-8 do pacote) os acentos
+    # viravam "�". O que nem o UTF-8 escreve (um nome que não é UTF-8) vira
+    # \udcNN, em vez de o logging despejar um traceback na tela.
     try:
-        logging.basicConfig(**_FORMATO_LOG)
-    except Exception:
-        _log_ok = False
+        _arquivo_log = logging.FileHandler(str(ARQ_LOG), encoding="utf-8",
+                                           errors="backslashreplace")
+    except TypeError:               # Python anterior ao 3.9, sem `errors`
+        _arquivo_log = logging.FileHandler(str(ARQ_LOG), encoding="utf-8")
+    _arquivo_log.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s",
+                                                "%Y-%m-%d %H:%M:%S"))
+    logging.basicConfig(level=logging.INFO, handlers=[_arquivo_log])
 except Exception:
     _log_ok = False
 
