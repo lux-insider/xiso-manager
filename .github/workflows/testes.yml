@@ -19,6 +19,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # A versão do Rust do lançador fica fixa: cada versão nova pode trazer
+  # avisos novos do clippy e deixar o CI vermelho sem o código ter mudado.
+  # Para atualizar, troque aqui e corrija o que o clippy novo apontar.
+  RUST: "1.98.0"
   # O Python portátil oficial ("embeddable", de python.org) do pacote do
   # Windows. Ao trocar a versão, troque também o SHA-256: a primeira execução
   # com a versão nova mostra o valor no passo "Baixar o Python portátil".
@@ -74,8 +78,10 @@ jobs:
         working-directory: windows/lancador
     steps:
       - uses: actions/checkout@v5
-      - name: Componentes do Rust
-        run: rustup component add clippy rustfmt
+      - name: Rust ${{ env.RUST }}
+        run: |
+          rustup toolchain install ${{ env.RUST }} --profile minimal --component clippy,rustfmt
+          rustup default ${{ env.RUST }}
       - name: Formatação
         run: cargo fmt --check
       - name: Clippy
