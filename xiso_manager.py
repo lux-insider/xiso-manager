@@ -2552,7 +2552,9 @@ def _tem_xbe(pasta):
 
 
 def _pode_sobrescrever(caminho, eh_pasta):
-    """Destino já ocupado: pergunta antes (o extract-xiso-pt nunca grava por cima sozinho)."""
+    """Destino já ocupado: pergunta antes. O extract-xiso-pt nunca grava por
+    cima sozinho (precisa do --sobrescrever); o oficial grava sem perguntar,
+    então a pergunta vale para os dois."""
     if eh_pasta:
         ocupado = os.path.isdir(caminho) and bool(os.listdir(caminho))
         chave = "p_sobrescrever_pasta"
@@ -2632,11 +2634,11 @@ def acao_extrair(arquivos=None):
                         cortar(os.path.basename(arquivo), 40),
                         EMO["arquivo"], largura_rotulo=8))
 
+        sobrescrever, seguir = _pode_sobrescrever(alvo, eh_pasta=True)
+        if not seguir:
+            print(resposta(t("pulado"), C.CINZA))
+            continue
         if eh_pt():
-            sobrescrever, seguir = _pode_sobrescrever(alvo, eh_pasta=True)
-            if not seguir:
-                print(resposta(t("pulado"), C.CINZA))
-                continue
             args = [bin_extract(), "extrair", arquivo, "-d", alvo, "--progresso-json"]
             if pular:
                 args.append("-s")
@@ -2796,11 +2798,11 @@ def acao_criar():
                         os.path.basename(os.path.normpath(tr["origem"])),
                         EMO["pasta"], largura_rotulo=8))
 
+        sobrescrever, seguir = _pode_sobrescrever(tr["alvo"], eh_pasta=False)
+        if not seguir:
+            print(resposta(t("pulado"), C.CINZA))
+            continue
         if eh_pt():
-            sobrescrever, seguir = _pode_sobrescrever(tr["alvo"], eh_pasta=False)
-            if not seguir:
-                print(resposta(t("pulado"), C.CINZA))
-                continue
             args = [bin_extract(), "criar", tr["origem"], "-s", tr["alvo"], "--progresso-json"]
             if liberar and _tem_xbe(tr["origem"]):
                 args.append("--liberar-midia")
@@ -2955,6 +2957,15 @@ def acao_reescrever(arquivos=None):
         pasta_saida = os.path.abspath(destino) if destino else os.path.dirname(origem)
         saida = os.path.join(pasta_saida, os.path.basename(origem))
         antigo = origem + ".old"
+        # Em outra pasta, o ISO novo pega o lugar de um arquivo com o mesmo
+        # nome que já esteja lá (o oficial grava com O_TRUNC, sem perguntar).
+        # Na mesma pasta, o nome é o do próprio original, que o oficial
+        # renomeia para .old antes de gravar.
+        if not _mesma_pasta(pasta_saida, os.path.dirname(origem)):
+            _, seguir = _pode_sobrescrever(saida, eh_pasta=False)
+            if not seguir:
+                print(resposta(t("pulado"), C.CINZA))
+                continue
         try:
             antes = os.stat(saida).st_mtime_ns
         except OSError:

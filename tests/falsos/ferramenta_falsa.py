@@ -14,7 +14,8 @@ demora, as falhas e a reação aos sinais:
 - extract-xiso oficial: sem tratador nenhum, como o programa em C: o sinal o
   mata no meio. Na reescrita (-r) ele renomeia o original para <nome>.old
   antes de começar, grava o novo com O_TRUNC e, só se falhar por erro (não por
-  sinal), apaga o novo pela metade.
+  sinal), apaga o novo pela metade. Na criação (-c) e na extração (-x),
+  grava por cima do que já estiver no destino, sem perguntar.
 
 Variáveis de ambiente:
   XMF_PASSOS    passos de trabalho (padrão 4)
@@ -367,6 +368,36 @@ def oficial_reescrever():
     escrever("\n%s successfully rewritten as %s\n" % (iso, novo))
 
 
+def oficial_criar():
+    # -c <pasta> [nome]: o nome pode trazer a pasta; sem ele, <pasta>.iso na
+    # pasta atual (create_xiso, extract-xiso.c)
+    i = ARGS.index("-c")
+    pasta = ARGS[i + 1]
+    nome = ARGS[i + 2] if len(ARGS) > i + 2 and not ARGS[i + 2].startswith("-") else None
+    saida = nome or os.path.basename(os.path.normpath(pasta)) + ".iso"
+    dados = b"".join(
+        open(os.path.join(pasta, n), "rb").read()
+        for n in sorted(os.listdir(pasta)) if os.path.isfile(os.path.join(pasta, n)))
+    escrever("\ncreating %s:\n\n" % os.path.basename(saida))
+    comecou()
+    with open(saida, "wb") as f:                      # O_TRUNC, como o original
+        f.write(b"CRIADO\n")
+        for i in range(PASSOS):
+            f.write(dados[i::PASSOS])
+            f.flush()
+            escrever("adding file%d.bin (%d bytes) [OK]\n" % (i, len(dados) // PASSOS))
+            if FALHAR and i == PASSOS // 2:
+                f.close()
+                os.remove(saida)                      # if ( err ) unlink( xiso_path )
+                escrever("write error: No space left on device\n")
+                escrever("\ncould not create %s\n" % os.path.basename(saida))
+                sys.exit(1)
+            time.sleep(PAUSA)
+    anotar("terminou")
+    escrever("\nsucessfully created %s (%d files totalling %d bytes added)\n"
+             % (os.path.basename(saida), PASSOS, len(dados)))
+
+
 def oficial_extrair():
     pasta = opcao("-d")
     os.makedirs(pasta, exist_ok=True)
@@ -404,6 +435,8 @@ def main():
             oficial_reescrever()
         elif "-x" in ARGS:
             oficial_extrair()
+        elif "-c" in ARGS:
+            oficial_criar()
         elif "-l" in ARGS:
             pt_listar()
         else:

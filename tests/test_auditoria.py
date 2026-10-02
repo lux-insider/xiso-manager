@@ -168,6 +168,96 @@ class R3OficialInterrompido(Base):
         self.assertEqual(outro.read_bytes(), b"OUTRO ARQUIVO")
 
 
+class V2OficialPerguntaAntesDeGravarPorCima(Base):
+    """V-2: o extract-xiso oficial grava por cima do que já está no destino,
+    sem perguntar (O_TRUNC). Com o extract-xiso-pt o menu perguntava antes;
+    com o oficial, não, e outra cópia que o usuário tinha no destino sumia."""
+
+    oficial = True
+    MEU = b"COPIA DO USUARIO"
+
+    def rodar(self, respostas):
+        codigo, saida, erros = self.amb.rodar(respostas)
+        self.assertEqual(codigo, 0, erros)
+        return sem_cor(saida)
+
+    def extrair(self, resposta):
+        pasta = self.jogos / "Halo"
+        pasta.mkdir()
+        (pasta / "arquivo0.bin").write_bytes(self.MEU)
+        # destino padrão; pular update? não; silencioso? não; confirmar;
+        # "já tem arquivos. Extrair por cima?"; ENTER
+        saida = self.rodar(["3", "c", str(self.iso), "", "", "", "", resposta, "", "0"])
+        return saida, (pasta / "arquivo0.bin").read_bytes()
+
+    def test_extrair_em_pasta_com_arquivos_pergunta(self):
+        saida, conteudo = self.extrair("n")
+        self.assertIn("já tem arquivos. Extrair por cima?", saida)
+        self.assertIn("pulado", saida)
+        self.assertEqual(conteudo, self.MEU, "o arquivo do usuário não pode mudar")
+        self.assertFalse(self.amb.pids.exists(), "a ferramenta não pode rodar")
+
+    def test_extrair_por_cima_quando_o_usuario_aceita(self):
+        _saida, conteudo = self.extrair("s")
+        self.assertEqual(conteudo, b"x" * 1000)
+
+    def criar(self, resposta):
+        origem = self.amb.dir / "jogo"
+        origem.mkdir()
+        (origem / "default.xbe").write_bytes(b"XBE")
+        alvo = self.amb.iso("Novo.iso", self.MEU)
+        # outra pasta? não; nome; sem patch? não; silencioso? não; confirmar;
+        # "já existe. Substituir?"; ENTER
+        saida = self.rodar(["5", str(origem), "", str(alvo), "", "", "", resposta, "", "0"])
+        return saida, alvo.read_bytes()
+
+    def test_criar_sobre_iso_que_existe_pergunta(self):
+        saida, conteudo = self.criar("n")
+        self.assertIn("já existe. Substituir?", saida)
+        self.assertIn("pulado", saida)
+        self.assertEqual(conteudo, self.MEU, "a ISO do usuário não pode mudar")
+        self.assertFalse(self.amb.pids.exists(), "a ferramenta não pode rodar")
+
+    def test_criar_por_cima_quando_o_usuario_aceita(self):
+        _saida, conteudo = self.criar("s")
+        self.assertEqual(conteudo, b"CRIADO\nXBE")
+
+    def reescrever(self, destino, resposta=None):
+        # apagar? não; sem patch? não; silencioso? não; confirmar;
+        # ["já existe. Substituir?"]; ENTER
+        respostas = ["6", "c", str(self.iso), str(destino), "", "", "", ""]
+        respostas += [resposta] if resposta else []
+        return self.rodar(respostas + ["", "0"])
+
+    def test_reescrever_para_pasta_com_a_mesma_iso_pergunta(self):
+        destino = self.amb.dir / "otimizados"
+        copia = self.amb.iso("Halo.iso", self.MEU, pasta=destino)
+        saida = self.reescrever(destino, "n")
+        self.assertIn("já existe. Substituir?", saida)
+        self.assertIn("pulado", saida)
+        self.assertEqual(copia.read_bytes(), self.MEU, "a cópia do usuário não pode mudar")
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"},
+                         "sem reescrita, o original não vira .old")
+
+    def test_reescrever_por_cima_quando_o_usuario_aceita(self):
+        destino = self.amb.dir / "otimizados"
+        copia = self.amb.iso("Halo.iso", self.MEU, pasta=destino)
+        self.reescrever(destino, "s")
+        self.assertEqual(len(copia.read_bytes()), len(ORIGINAL), "a ISO reescrita fica no destino")
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso.old": "ORIGINAL"})
+
+    def test_reescrever_na_mesma_pasta_por_outro_caminho_nao_pergunta(self):
+        # o nome no destino é o do próprio original, que o oficial renomeia
+        # para .old antes de gravar: não há o que perguntar
+        atalho = self.amb.dir / "atalho"
+        link_de_pasta(atalho, self.jogos)
+        saida = self.reescrever(atalho)
+        self.assertNotIn("Substituir?", saida)
+        arquivos = self.arquivos(self.jogos)
+        self.assertEqual(arquivos.get("Halo.iso.old"), "ORIGINAL")
+        self.assertIn("Halo.iso", arquivos, "a ISO reescrita fica no lugar")
+
+
 # ── 2. Processos filhos ─────────────────────────────────────────────────────
 
 GOD = ["1", "c", None, None, "", "", "", "", "", "0"]
