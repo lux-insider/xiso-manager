@@ -1,0 +1,125 @@
+# Roda os testes a cada push na main e em todo pull request, no Linux e no
+# Windows. O Windows é o que não dá para testar numa máquina Linux: o
+# lançador compilado com o linker da Microsoft, o menu no Python do Windows,
+# a janela do console fechada no meio de uma reescrita (W-1) e o pacote
+# montado como chega ao usuário, com o Python portátil oficial.
+name: Testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # O Python portátil oficial ("embeddable", de python.org) do pacote do
+  # Windows. Ao trocar a versão, troque também o SHA-256: a primeira execução
+  # com a versão nova mostra o valor no passo "Baixar o Python portátil".
+  PYTHON_PORTATIL: "3.14.0"
+  PYTHON_PORTATIL_SHA256: ""
+
+jobs:
+  menu-linux:
+    name: Menu no Linux (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Testes
+        run: python -m unittest discover -s tests -v
+
+  menu-windows:
+    name: Menu no Windows (Python ${{ matrix.python }})
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.8: o mais antigo que o README promete; 3.14: o do pacote
+        python: ["3.8", "3.14"]
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Testes
+        run: python -m unittest discover -s tests -v
+
+  lancador:
+    name: Lançador (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: windows/lancador
+    steps:
+      - uses: actions/checkout@v5
+      - name: Componentes do Rust
+        run: rustup component add clippy rustfmt
+      - name: Formatação
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Testes
+        run: cargo test
+      - name: Compilar
+        run: cargo build --release
+      - name: Guardar o lançador do Windows
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lancador-windows
+          path: windows/lancador/target/release/xiso-manager.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  pacote-windows:
+    name: Pacote do Windows
+    needs: lancador
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - uses: actions/download-artifact@v4
+        with:
+          name: lancador-windows
+          path: lancador
+      - name: Baixar o Python portátil
+        shell: pwsh
+        run: |
+          $zip = "python-$env:PYTHON_PORTATIL-embed-amd64.zip"
+          Invoke-WebRequest "https://www.python.org/ftp/python/$env:PYTHON_PORTATIL/$zip" -OutFile $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          Write-Output "SHA-256 de ${zip}: $hash"
+          if ($env:PYTHON_PORTATIL_SHA256 -and $hash -ne $env:PYTHON_PORTATIL_SHA256) {
+            throw "O SHA-256 do $zip não confere com o PYTHON_PORTATIL_SHA256 do workflow"
+          }
+          "XM_PYTHON_PORTATIL=$PWD\$zip" >> $env:GITHUB_ENV
+          "XM_LANCADOR=$PWD\lancador\xiso-manager.exe" >> $env:GITHUB_ENV
+      - name: Testes do pacote
+        run: python -m unittest tests.test_pacote_windows -v
