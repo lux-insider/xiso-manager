@@ -70,7 +70,7 @@ class PacoteWindows(unittest.TestCase):
         self.assertIn("FERRAMENTA NÃO ENCONTRADA", texto)
         self.assertNotIn("Erro inesperado", texto)
         self.assertNotIn("Traceback", erros)
-        self.assertTrue((self.pasta / "config.json").is_file(), "o config fica ao lado do programa")
+        self.assertTrue((self.pasta / "xiso-manager.log").is_file(), "o log fica ao lado do programa")
 
     def falta(self, arquivo):
         guardado = arquivo.with_name(arquivo.name + ".fora")

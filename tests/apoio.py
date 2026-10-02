@@ -62,8 +62,13 @@ class Ambiente:
         self.config(bin_extract_xiso=str(self.ferramenta("extract-xiso" if oficial else "extract-xiso-pt")),
                     bin_iso2god=str(self.ferramenta("iso2god")),
                     pasta_padrao=str(self.dir))
+        # uma pasta pessoal só do teste: no Windows a pasta temporária fica
+        # dentro da pessoal, e o menu mostraria os caminhos como "~\\..."
+        casa = self.dir / "casa"
+        casa.mkdir()
         self.env = dict(os.environ, XMF_PIDS=str(self.pids), XMF_REGISTRO=str(self.registro),
-                        NO_COLOR="1", PYTHONIOENCODING="utf-8")
+                        NO_COLOR="1", PYTHONIOENCODING="utf-8",
+                        HOME=str(casa), USERPROFILE=str(casa))
         self.env.pop("XMF_SAIDA", None)
         self.env.pop("XMF_NOME", None)
 
@@ -200,28 +205,141 @@ def link_de_pasta(link, alvo):
         _winapi.CreateJunction(str(alvo), str(link))
 
 
-def janela_do_console(pid):
-    """Windows: a janela do console em que o processo roda (0 se não achar).
-    Só um processo preso a esse console a enxerga, então quem pergunta é um
-    Python à parte, que se solta do console dele e se prende ao do outro."""
-    codigo = ("import ctypes, sys\n"
-              "k = ctypes.WinDLL('kernel32')\n"
-              "k.GetConsoleWindow.restype = ctypes.c_void_p\n"
-              "k.FreeConsole()\n"
-              "print((k.AttachConsole(int(sys.argv[1])) and k.GetConsoleWindow()) or 0)\n")
-    r = subprocess.run([sys.executable, "-c", codigo, str(pid)],
-                       capture_output=True, text=True, timeout=30)
-    return int(r.stdout.strip() or 0)
+class ConsoleProprio:
+    """Windows: um processo num console só dele, como um programa aberto
+    numa janela. O console é um pseudoconsole (o mesmo do Windows Terminal),
+    e fechar() é fechar a janela ou a aba: o Windows manda CTRL_CLOSE_EVENT a
+    todos os processos presos ao console. A entrada e a saída padrão são um
+    pipe e um arquivo, como nos outros testes; o console serve para o aviso.
 
+    (Mandar WM_CLOSE para a janela do console não serve: no runner do
+    GitHub a janela é de fachada e ignora a mensagem.)"""
 
-def fechar_janela(janela):
-    """Windows: fecha a janela como pelo X (WM_CLOSE)."""
-    import ctypes
-    from ctypes import wintypes
-    user32 = ctypes.WinDLL("user32", use_last_error=True)
-    user32.PostMessageW.argtypes = (wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
-    if not user32.PostMessageW(janela, 0x0010, 0, 0):
-        raise OSError(ctypes.get_last_error(), "PostMessageW falhou")
+    def __init__(self, argumentos, env, saida, cwd=None):
+        import ctypes
+        import msvcrt
+        import threading
+        from ctypes import wintypes as w
+
+        class COORD(ctypes.Structure):
+            _fields_ = [("X", w.SHORT), ("Y", w.SHORT)]
+
+        class STARTUPINFOW(ctypes.Structure):
+            _fields_ = [("cb", w.DWORD), ("lpReserved", w.LPWSTR), ("lpDesktop", w.LPWSTR),
+                        ("lpTitle", w.LPWSTR), ("dwX", w.DWORD), ("dwY", w.DWORD),
+                        ("dwXSize", w.DWORD), ("dwYSize", w.DWORD), ("dwXCountChars", w.DWORD),
+                        ("dwYCountChars", w.DWORD), ("dwFillAttribute", w.DWORD),
+                        ("dwFlags", w.DWORD), ("wShowWindow", w.WORD), ("cbReserved2", w.WORD),
+                        ("lpReserved2", ctypes.c_void_p), ("hStdInput", w.HANDLE),
+                        ("hStdOutput", w.HANDLE), ("hStdError", w.HANDLE)]
+
+        class STARTUPINFOEXW(ctypes.Structure):
+            _fields_ = [("StartupInfo", STARTUPINFOW), ("lpAttributeList", ctypes.c_void_p)]
+
+        class PROCESS_INFORMATION(ctypes.Structure):
+            _fields_ = [("hProcess", w.HANDLE), ("hThread", w.HANDLE),
+                        ("dwProcessId", w.DWORD), ("dwThreadId", w.DWORD)]
+
+        k32 = self._k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.CreatePipe.argtypes = (ctypes.POINTER(w.HANDLE), ctypes.POINTER(w.HANDLE),
+                                   ctypes.c_void_p, w.DWORD)
+        k32.CreatePseudoConsole.argtypes = (COORD, w.HANDLE, w.HANDLE, w.DWORD,
+                                            ctypes.POINTER(ctypes.c_void_p))
+        k32.CreatePseudoConsole.restype = ctypes.c_long
+        k32.ClosePseudoConsole.argtypes = (ctypes.c_void_p,)
+        k32.ClosePseudoConsole.restype = None
+        k32.InitializeProcThreadAttributeList.argtypes = (ctypes.c_void_p, w.DWORD, w.DWORD,
+                                                          ctypes.POINTER(ctypes.c_size_t))
+        k32.UpdateProcThreadAttribute.argtypes = (ctypes.c_void_p, w.DWORD, ctypes.c_size_t,
+                                                  ctypes.c_void_p, ctypes.c_size_t,
+                                                  ctypes.c_void_p, ctypes.c_void_p)
+        k32.CreateProcessW.argtypes = (w.LPCWSTR, ctypes.c_wchar_p, ctypes.c_void_p,
+                                       ctypes.c_void_p, w.BOOL, w.DWORD, ctypes.c_void_p,
+                                       w.LPCWSTR, ctypes.POINTER(STARTUPINFOEXW),
+                                       ctypes.POINTER(PROCESS_INFORMATION))
+        k32.ReadFile.argtypes = (w.HANDLE, ctypes.c_void_p, w.DWORD,
+                                 ctypes.POINTER(w.DWORD), ctypes.c_void_p)
+        k32.WaitForSingleObject.argtypes = (w.HANDLE, w.DWORD)
+        k32.WaitForSingleObject.restype = w.DWORD
+        k32.CloseHandle.argtypes = (w.HANDLE,)
+
+        def conferir(ok, oque):
+            if not ok:
+                raise ctypes.WinError(ctypes.get_last_error(), oque)
+
+        # o pseudoconsole: a "tela" dele é lida e descartada numa thread
+        entrada_pc, self._entrada_pc = w.HANDLE(), w.HANDLE()
+        self._saida_pc, saida_pc = w.HANDLE(), w.HANDLE()
+        conferir(k32.CreatePipe(ctypes.byref(entrada_pc), ctypes.byref(self._entrada_pc), None, 0),
+                 "CreatePipe")
+        conferir(k32.CreatePipe(ctypes.byref(self._saida_pc), ctypes.byref(saida_pc), None, 0),
+                 "CreatePipe")
+        self._console = ctypes.c_void_p()
+        resultado = k32.CreatePseudoConsole(COORD(120, 40), entrada_pc, saida_pc, 0,
+                                            ctypes.byref(self._console))
+        if resultado != 0:
+            raise OSError("CreatePseudoConsole: 0x%08x" % (resultado & 0xFFFFFFFF))
+        k32.CloseHandle(entrada_pc)
+        k32.CloseHandle(saida_pc)
+
+        def escoar():
+            pedaco, lido = ctypes.create_string_buffer(4096), w.DWORD()
+            while k32.ReadFile(self._saida_pc, pedaco, 4096, ctypes.byref(lido), None) and lido.value:
+                pass
+        threading.Thread(target=escoar, daemon=True).start()
+
+        # a entrada padrão (um pipe) e a saída (o arquivo), herdadas pelo processo
+        ler, self._escrever = os.pipe()
+        manuseio_entrada = msvcrt.get_osfhandle(ler)
+        manuseio_saida = msvcrt.get_osfhandle(saida.fileno())
+        for manuseio in (manuseio_entrada, manuseio_saida):
+            os.set_handle_inheritable(manuseio, True)
+
+        tamanho = ctypes.c_size_t()
+        k32.InitializeProcThreadAttributeList(None, 1, 0, ctypes.byref(tamanho))
+        self._lista = ctypes.create_string_buffer(tamanho.value)
+        lista = ctypes.cast(self._lista, ctypes.c_void_p)
+        conferir(k32.InitializeProcThreadAttributeList(lista, 1, 0, ctypes.byref(tamanho)),
+                 "InitializeProcThreadAttributeList")
+        conferir(k32.UpdateProcThreadAttribute(lista, 0, 0x00020016,   # PSEUDOCONSOLE
+                                               self._console, ctypes.sizeof(ctypes.c_void_p),
+                                               None, None), "UpdateProcThreadAttribute")
+        inicio = STARTUPINFOEXW()
+        inicio.StartupInfo.cb = ctypes.sizeof(STARTUPINFOEXW)
+        inicio.StartupInfo.dwFlags = 0x100                         # STARTF_USESTDHANDLES
+        inicio.StartupInfo.hStdInput = manuseio_entrada
+        inicio.StartupInfo.hStdOutput = manuseio_saida
+        inicio.StartupInfo.hStdError = manuseio_saida
+        inicio.lpAttributeList = lista
+        bloco = "".join("%s=%s\0" % (k, v)
+                        for k, v in sorted(env.items(), key=lambda kv: kv[0].upper())) + "\0"
+        ambiente = ctypes.create_unicode_buffer(bloco, len(bloco.encode("utf-16-le")) // 2 + 1)
+        linha = ctypes.create_unicode_buffer(subprocess.list2cmdline(argumentos))
+        processo = PROCESS_INFORMATION()
+        conferir(k32.CreateProcessW(None, linha, None, None, True,
+                                    0x00080000 | 0x00000400,   # STARTUPINFOEX, env Unicode
+                                    ctypes.cast(ambiente, ctypes.c_void_p),
+                                    str(cwd) if cwd else None,
+                                    ctypes.byref(inicio), ctypes.byref(processo)),
+                 "CreateProcessW")
+        os.close(ler)
+        k32.CloseHandle(processo.hThread)
+        self._processo = processo.hProcess
+        self.pid = processo.dwProcessId
+
+    def digitar(self, respostas):
+        os.write(self._escrever, "".join(r + "\n" for r in respostas).encode("utf-8"))
+
+    def fechar(self):
+        """Fecha o console, como o X da janela. O ClosePseudoConsole pode
+        esperar os processos saírem: roda numa thread."""
+        import threading
+        threading.Thread(target=self._k32.ClosePseudoConsole, args=(self._console,),
+                         daemon=True).start()
+
+    def esperar(self, prazo):
+        """True se o processo saiu dentro do prazo (em segundos)."""
+        return self._k32.WaitForSingleObject(self._processo, int(prazo * 1000)) == 0
 
 
 def matar(pid):
