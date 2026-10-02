@@ -23,7 +23,7 @@ env:
   # Windows. Ao trocar a versão, troque também o SHA-256: a primeira execução
   # com a versão nova mostra o valor no passo "Baixar o Python portátil".
   PYTHON_PORTATIL: "3.14.7"
-  PYTHON_PORTATIL_SHA256: ""
+  PYTHON_PORTATIL_SHA256: "d297e5ff019966817ad8502465176139f2d3d840fa4ed84b13bed399a6ab1f15"
 
 jobs:
   menu-linux:
@@ -86,7 +86,7 @@ jobs:
         run: cargo build --release
       - name: Guardar o lançador do Windows
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: lancador-windows
           path: windows/lancador/target/release/xiso-manager.exe
@@ -105,7 +105,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: lancador-windows
           path: lancador
