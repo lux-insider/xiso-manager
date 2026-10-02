@@ -17,12 +17,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from apoio import PROGRAMA, WINDOWS  # noqa: E402
+from apoio import PROGRAMA, WINDOWS, ConsoleProprio, matar_arvore  # noqa: E402
 
 LANCADOR = os.environ.get("XM_LANCADOR")
 PORTATIL = os.environ.get("XM_PYTHON_PORTATIL")
@@ -94,6 +95,62 @@ class PacoteWindows(unittest.TestCase):
 
     def test_falta_o_python_exe(self):
         self.falta(self.python / "python.exe")
+
+    # ── V-4: erro fatal com a janela aberta com dois cliques ─────────────
+
+    def programa_que_sai_com(self, codigo):
+        """Troca o programa por um que mostra um erro e sai com `codigo`."""
+        (self.pasta / "xiso_manager.py").write_text(
+            "import sys\nprint('  \u274c  falhou de propósito')\nsys.exit(%d)\n" % codigo,
+            encoding="utf-8")
+
+    def na_janela(self, argumentos, nome):
+        """Roda num console só dele, como um programa aberto com dois
+        cliques (ou o cmd.exe, como um terminal aberto antes). A entrada é
+        um pipe que fica aberto: um ENTER esperado à toa trava o teste."""
+        tela = self.fora / nome
+        arquivo = open(tela, "wb")
+        self.addCleanup(arquivo.close)
+        console = ConsoleProprio(argumentos, dict(os.environ), arquivo, cwd=self.fora)
+        self.addCleanup(lambda: matar_arvore(console))
+        return console, tela
+
+    @staticmethod
+    def ler(tela):
+        return tela.read_text(encoding="utf-8", errors="replace")
+
+    def test_erro_fatal_na_janela_propria_espera_enter(self):
+        self.programa_que_sai_com(1)
+        console, tela = self.na_janela([str(self.pasta / "xiso-manager.exe")], "tela.txt")
+        limite = time.time() + 60
+        while "Aperte ENTER para fechar..." not in self.ler(tela) and time.time() < limite:
+            time.sleep(0.1)
+        self.assertIn("Aperte ENTER para fechar...", self.ler(tela))
+        self.assertIn("falhou de propósito", self.ler(tela))
+        self.assertFalse(console.esperar(1), "a janela não pode fechar antes do ENTER")
+        console.digitar([""])
+        self.assertTrue(console.esperar(20), "o ENTER fecha a janela")
+        self.assertEqual(console.codigo(), 1)
+
+    def test_saida_normal_e_ctrl_c_fecham_na_hora(self):
+        for codigo in (0, 130):
+            with self.subTest(codigo=codigo):
+                self.programa_que_sai_com(codigo)
+                console, tela = self.na_janela([str(self.pasta / "xiso-manager.exe")],
+                                               "tela%d.txt" % codigo)
+                self.assertTrue(console.esperar(60), "não pode esperar ENTER: " + self.ler(tela))
+                self.assertEqual(console.codigo(), codigo)
+                self.assertNotIn("Aperte ENTER", self.ler(tela))
+
+    def test_erro_fatal_num_terminal_aberto_antes_nao_espera(self):
+        # o console é do cmd.exe, que continua aberto com a mensagem
+        self.programa_que_sai_com(1)
+        console, tela = self.na_janela(
+            ["cmd.exe", "/d", "/c", str(self.pasta / "xiso-manager.exe")], "tela.txt")
+        self.assertTrue(console.esperar(60), "não pode esperar ENTER: " + self.ler(tela))
+        self.assertEqual(console.codigo(), 1)
+        self.assertIn("falhou de propósito", self.ler(tela))
+        self.assertNotIn("Aperte ENTER", self.ler(tela))
 
 
 if __name__ == "__main__":

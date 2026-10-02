@@ -341,6 +341,16 @@ class ConsoleProprio:
         """True se o processo saiu dentro do prazo (em segundos)."""
         return self._k32.WaitForSingleObject(self._processo, int(prazo * 1000)) == 0
 
+    def codigo(self):
+        """O código de saída do processo (depois de esperar)."""
+        import ctypes
+        from ctypes import wintypes as w
+        self._k32.GetExitCodeProcess.argtypes = (w.HANDLE, ctypes.POINTER(w.DWORD))
+        codigo = w.DWORD()
+        if not self._k32.GetExitCodeProcess(self._processo, ctypes.byref(codigo)):
+            raise ctypes.WinError(ctypes.get_last_error(), "GetExitCodeProcess")
+        return codigo.value
+
 
 def matar(pid):
     try:
