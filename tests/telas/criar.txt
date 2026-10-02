@@ -57,7 +57,7 @@
   ── 4/4 · Verificação ───────────────────────────────────────────
   📁 Destino       <BASE>/trabalho
   📦 Necessário    0.01 MiB  (com margem: 0.01 MiB)
-  💾 Disponível    ##.## GiB   Total: ###.## GiB
+  💾 Disponível #.## GiB   Total: #.## GiB
   📊 Uso atual     <BARRA> ##.#%
   ✓  Espaço suficiente.
 
