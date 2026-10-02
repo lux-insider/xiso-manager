@@ -309,7 +309,7 @@ class W1JanelaFechadaNoWindows(Base):
         self.assertIsNotNone(xm._ferramenta.poll(), "esperou a ferramenta sair")
         self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
         self.assertIsNotNone(xm._encerrar)
-        self.assertIn("Sessão encerrada", (self.amb.app / "xiso-manager.log").read_text())
+        self.assertIn("Sessão encerrada", (self.amb.app / "xiso-manager.log").read_text(encoding="utf-8"))
 
     def test_ferramenta_que_nao_sai_tem_prazo(self):
         xm = self.preparar(30)
