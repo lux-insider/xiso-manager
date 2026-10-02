@@ -57,6 +57,15 @@ iso2god.exe               iso2god em Rust, em português
 No Windows Terminal aparece com cores e emoji. O `Ctrl+C` funciona igual ao
 Linux: espera o iso2god apagar a conversão incompleta antes de sair.
 
+> **Windows 10:** com dois cliques, o Windows 10 abre o programa no console
+> antigo, que não desenha emoji: no lugar deles aparecem caixinhas com `?`. É
+> só visual, o programa funciona igual. Para ver os emojis, instale o
+> [Windows Terminal](https://aka.ms/terminal) (gratuito; no Windows 11 ele já
+> é o padrão) e abra o programa por ele: aperte `Win+R` e rode
+> `wt "<pasta do xiso-manager>\xiso-manager.exe"`, ou clique com o botão
+> direito num espaço vazio da pasta, escolha **Abrir no Terminal** e digite
+> `.\xiso-manager.exe`.
+
 O lançador é um programa pequeno em Rust (`windows/lancador/`); para gerar o
 `.exe` a partir do Linux:
 
