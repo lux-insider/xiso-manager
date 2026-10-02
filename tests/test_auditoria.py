@@ -743,6 +743,40 @@ def esperar_texto(processo, texto, prazo=15):
     raise AssertionError("o menu não chegou em %r" % texto)
 
 
+class V5ConfigIlegivel(Base):
+    """V-5: um config.json que não dá para ler voltava ao padrão sem aviso, e
+    a próxima mudança o regravava: os caminhos configurados se perdiam."""
+
+    def abrir_com(self, conteudo):
+        arquivo = self.amb.app / "config.json"
+        arquivo.write_bytes(conteudo)
+        # ENTER no aviso; ENTER nas ferramentas (se perguntar); sair
+        codigo, saida, erros = self.amb.rodar(["", "", "", "0"])
+        self.assertEqual(codigo, 0, erros)
+        return sem_cor(saida)
+
+    def test_guarda_uma_copia_e_avisa(self):
+        casos = {"JSON inválido": b'{"pasta_padrao": "/jogos", ',
+                 "não é um objeto": b'["/jogos"]',
+                 "não é UTF-8": b'{"pasta_padrao": "/jogos/A\xe7\xe3o"}'}
+        for caso, conteudo in casos.items():
+            with self.subTest(caso):
+                saida = self.abrir_com(conteudo)
+                self.assertIn("Não consegui ler o config.json: as configurações voltaram ao padrão.",
+                              saida)
+                copia = self.amb.app / "config.json.invalido"
+                self.assertIn("O arquivo antigo ficou em %s" % copia, saida)
+                self.assertEqual(copia.read_bytes(), conteudo, "a cópia é o arquivo inteiro")
+                self.assertIn("config.json ilegível",
+                              (self.amb.app / "xiso-manager.log").read_text(encoding="utf-8"))
+                self.assertNotIn("Erro inesperado", saida)
+
+    def test_config_valido_nao_avisa(self):
+        saida = self.abrir_com(b'{"idioma": "pt"}')
+        self.assertNotIn("config.json", saida)
+        self.assertFalse((self.amb.app / "config.json.invalido").exists())
+
+
 class C1ConfigRegravadoNoLugar(Base):
     """C-1: o config.json era truncado e regravado no lugar; morrer no meio
     da gravação (queda de energia, SIGKILL) o deixava pela metade, e as
