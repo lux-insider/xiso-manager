@@ -21,6 +21,7 @@ mod console {
     #[link(name = "kernel32")]
     extern "system" {
         fn SetConsoleCtrlHandler(handler: Option<Handler>, add: i32) -> i32;
+        fn GetConsoleProcessList(lista: *mut u32, tamanho: u32) -> u32;
     }
     unsafe extern "system" fn tratar(_tipo: u32) -> i32 {
         1
@@ -30,13 +31,51 @@ mod console {
             SetConsoleCtrlHandler(Some(tratar), 1);
         }
     }
+
+    /// Com o Python já fechado, o Ctrl+C volta a fechar o lançador.
+    pub fn devolver_ctrl_c() {
+        unsafe {
+            SetConsoleCtrlHandler(Some(tratar), 0);
+        }
+    }
+
+    /// Só este processo está no console: ele foi criado para o lançador
+    /// (aberto com dois cliques) e fecha junto com ele.
+    pub fn janela_so_minha() -> bool {
+        let mut lista = [0u32; 4];
+        unsafe { GetConsoleProcessList(lista.as_mut_ptr(), lista.len() as u32) == 1 }
+    }
+}
+
+#[cfg(not(windows))]
+mod console {
+    pub fn devolver_ctrl_c() {}
+    pub fn janela_so_minha() -> bool {
+        false
+    }
+}
+
+/// O Python saiu pelo Ctrl+C sem tratá-lo (STATUS_CONTROL_C_EXIT).
+const SAIDA_CTRL_C_DO_WINDOWS: i32 = 0xC000_013A_u32 as i32;
+
+/// Esperar ENTER antes de fechar? Só quando o programa terminou com erro (o
+/// "❌ <motivo>" do erro fatal sai com 1; uma queda do Python, com outro
+/// código) e a janela é só do lançador: aberta com dois cliques, ela fecha
+/// junto com ele, antes de dar para ler. Num terminal aberto antes, a
+/// mensagem continua lá. Saída normal e Ctrl+C (130) fecham na hora.
+fn esperar_antes_de_fechar(codigo: i32, janela_so_minha: bool) -> bool {
+    janela_so_minha && !matches!(codigo, 0 | 130 | SAIDA_CTRL_C_DO_WINDOWS)
+}
+
+fn esperar_enter() {
+    eprint!("  Aperte ENTER para fechar...");
+    io::stderr().flush().ok();
+    let _ = io::stdin().lock().read_line(&mut String::new());
 }
 
 fn falhar(mensagem: &str) -> ! {
     eprintln!("\n  xiso-manager: {mensagem}\n");
-    eprint!("  Aperte ENTER para fechar...");
-    io::stderr().flush().ok();
-    let _ = io::stdin().lock().read_line(&mut String::new());
+    esperar_enter();
     exit(1);
 }
 
@@ -129,7 +168,44 @@ fn main() {
         .status();
 
     match status {
-        Ok(s) => exit(s.code().unwrap_or(1)),
+        Ok(s) => {
+            let codigo = s.code().unwrap_or(1);
+            if esperar_antes_de_fechar(codigo, console::janela_so_minha()) {
+                if codigo != 1 {
+                    eprintln!("\n  xiso-manager: o Python fechou com erro (código {codigo:#X}).");
+                }
+                eprintln!();
+                console::devolver_ctrl_c();
+                esperar_enter();
+            }
+            exit(codigo)
+        }
         Err(e) => falhar(&format!("não consegui abrir o Python ({e})")),
+    }
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test]
+    fn erro_na_janela_so_do_lancador_espera_enter() {
+        assert!(esperar_antes_de_fechar(1, true));
+        // uma queda do Python (acesso inválido à memória)
+        assert!(esperar_antes_de_fechar(0xC000_0005_u32 as i32, true));
+    }
+
+    #[test]
+    fn saida_normal_e_ctrl_c_fecham_na_hora() {
+        for codigo in [0, 130, SAIDA_CTRL_C_DO_WINDOWS] {
+            assert!(!esperar_antes_de_fechar(codigo, true), "{codigo:#X}");
+        }
+    }
+
+    #[test]
+    fn terminal_aberto_antes_nao_espera() {
+        for codigo in [0, 1, 130, 0xC000_0005_u32 as i32] {
+            assert!(!esperar_antes_de_fechar(codigo, false), "{codigo:#X}");
+        }
     }
 }
