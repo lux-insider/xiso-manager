@@ -8,33 +8,43 @@ Os menus estáticos também são conferidos em cores, num terminal de verdade
 (pty). Só o que muda sozinho de uma execução para outra é mascarado: horas,
 durações, velocidades e o espaço livre do disco.
 
+No Windows as mesmas telas valem: a pasta base tem o mesmo comprimento da
+do Linux (as linhas longas são cortadas no mesmo ponto), as barras dos
+caminhos são trocadas por "/" e o ".cmd" das ferramentas falsas sai do nome.
+
 Para regravar (só de propósito, explicando no commit o que mudou):
     XM_GRAVAR_TELAS=1 python3 -m unittest tests.test_telas
 """
 
-import fcntl
 import os
-import pty
 import re
 import select
 import struct
 import subprocess
 import sys
-import termios
 import time
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from apoio import Ambiente  # noqa: E402
+from apoio import WINDOWS, Ambiente  # noqa: E402
 
 TELAS = Path(__file__).resolve().parent / "telas"
-BASE = Path("/tmp/xm-telas")
+# o mesmo comprimento nos dois: "/tmp/xm-telas" e "C:\xm-telas-w"
+BASE = Path(os.environ.get("SystemDrive", "C:") + "\\xm-telas-w") if WINDOWS else Path("/tmp/xm-telas")
 GRAVAR = os.environ.get("XM_GRAVAR_TELAS") == "1"
 
 
 def normalizar(texto):
     texto = texto.replace("\r\n", "\n").replace(str(BASE), "<BASE>")
+    if WINDOWS:
+        texto = texto.replace("\\", "/")
+        texto = re.sub(r"(<BASE>/bin/[\w-]+)\.cmd\b", r"\1", texto)
+    # um caminho cortado logo no começo da pasta base ("/t…" ou "C:…")
+    texto = re.sub(r"(?<!\S)(\S+)…",
+                   lambda m: "<BASE>…" if str(BASE).replace("\\", "/").startswith(m.group(1))
+                   else m.group(0),
+                   texto)
     texto = re.sub(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d", "<DATA>", texto)
     texto = re.sub(r"\b\d\d:\d\d(:\d\d)?\b", "<T>", texto)
     texto = re.sub(r"\(\d+\.\d\d (MiB|GiB)/s\)", "(<V>)", texto)
@@ -68,6 +78,7 @@ class Telas(unittest.TestCase):
         (jogo / "dados.bin").write_bytes(b"d" * 9000)
         self.amb.config(pasta_padrao=str(self.jogos))
         self.amb.env["HOME"] = str(casa)
+        self.amb.env["USERPROFILE"] = str(casa)     # a pasta pessoal no Windows
         self.amb.env["XMF_PAUSA"] = "0"
         (BASE / "app" / "xiso-manager.log").unlink(missing_ok=True)
 
@@ -152,6 +163,7 @@ class Telas(unittest.TestCase):
 
     # ── os menus em cores, num terminal ──────────────────────────────────
 
+    @unittest.skipIf(WINDOWS, "o terminal de verdade (pty) só existe no Unix")
     def test_menus_em_cores(self):
         self.preparar()
         self.conferir("menu_cores", rodar_no_terminal(self.amb, ["c", "0", "s", "", "0"]))
@@ -159,6 +171,9 @@ class Telas(unittest.TestCase):
 
 def rodar_no_terminal(amb, entradas, colunas=100, linhas=40):
     """Roda o menu num pseudoterminal (cores ligadas), sem eco da entrada."""
+    import fcntl
+    import pty
+    import termios
     mestre, escravo = pty.openpty()
     fcntl.ioctl(escravo, termios.TIOCSWINSZ, struct.pack("HHHH", linhas, colunas, 0, 0))
     atributos = termios.tcgetattr(escravo)

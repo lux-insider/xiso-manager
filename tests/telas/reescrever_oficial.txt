@@ -94,7 +94,7 @@
     ├ adding file1.bin (13000 bytes) [OK]
     ├ adding file2.bin (13000 bytes) [OK]
     ├ adding file3.bin (13000 bytes) [OK]
-    └ <BASE>/jogos/Halo.iso successfully rewritten as /t…
+    └ <BASE>/jogos/Halo.iso successfully rewritten as <BASE>…
   ✓  Otimizando       concluído em <T>
     └ O ISO original ficou em <BASE>/jogos/Halo.iso.old
 

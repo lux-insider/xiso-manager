@@ -26,6 +26,7 @@ Variáveis de ambiente:
   XMF_PIDS      arquivo onde o PID é anotado quando o trabalho começa
   XMF_REGISTRO  arquivo onde ficam anotados os sinais recebidos e o fim
   XMF_TECLADO   "1": lê uma linha da entrada padrão e anota o que leu
+  XMF_NOME      o nome com que foi chamada (no Windows, quem chama é um .cmd)
 """
 
 import json
@@ -34,7 +35,8 @@ import signal
 import sys
 import time
 
-NOME = os.path.basename(sys.argv[0])
+# No Windows ela é chamada por um .cmd (ver tests/apoio.py), que diz o nome.
+NOME = os.environ.get("XMF_NOME") or os.path.basename(sys.argv[0])
 ARGS = sys.argv[1:]
 PT = "extract-xiso-pt" in NOME or "iso2god" in NOME
 OFICIAL = not PT
@@ -78,7 +80,7 @@ def _sinal(numero, _quadro):
 if PT:
     signal.signal(signal.SIGINT, _sinal)
     signal.signal(signal.SIGTERM, _sinal)
-    if signal.getsignal(signal.SIGHUP) != signal.SIG_IGN:
+    if hasattr(signal, "SIGHUP") and signal.getsignal(signal.SIGHUP) != signal.SIG_IGN:
         signal.signal(signal.SIGHUP, _sinal)
 else:
     signal.signal(signal.SIGINT, signal.SIG_DFL)
