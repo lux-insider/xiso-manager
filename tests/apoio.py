@@ -22,6 +22,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 PROGRAMA = RAIZ / "xiso_manager.py"
 FALSO = RAIZ / "tests" / "falsos" / "ferramenta_falsa.py"
+WINDOWS = os.name == "nt"
 
 
 def _executavel(caminho):
@@ -37,7 +38,9 @@ class Ambiente:
             Path(pasta).mkdir(parents=True)
             self.dir = Path(pasta)
         else:
-            self.dir = Path(tempfile.mkdtemp(prefix="xm-%s-" % caso))
+            # resolve(): no Windows a pasta temporária vem com o nome curto do
+            # DOS (RUNNER~1), e o programa mostra o caminho longo
+            self.dir = Path(tempfile.mkdtemp(prefix="xm-%s-" % caso)).resolve()
         self.app = self.dir / "app"
         self.bin = self.dir / "bin"
         self.app.mkdir()
@@ -45,15 +48,28 @@ class Ambiente:
         shutil.copy(PROGRAMA, self.app / "xiso_manager.py")
         _executavel(FALSO)
         for nome in ("extract-xiso-pt", "extract-xiso", "iso2god"):
-            (self.bin / nome).symlink_to(FALSO)
+            if WINDOWS:
+                # O Windows não executa um .py pelo nome nem segue o "#!": a
+                # ferramenta falsa é um .cmd que chama o Python com ela e diz
+                # com que nome foi chamada.
+                self.ferramenta(nome).write_text(
+                    '@set "XMF_NOME=%s"\n@"%s" "%s" %%*\n@exit /b %%ERRORLEVEL%%\n'
+                    % (nome, sys.executable, FALSO), encoding="oem")
+            else:
+                self.ferramenta(nome).symlink_to(FALSO)
         self.pids = self.dir / "pids.txt"
         self.registro = self.dir / "registro.txt"
-        self.config(bin_extract_xiso=str(self.bin / ("extract-xiso" if oficial else "extract-xiso-pt")),
-                    bin_iso2god=str(self.bin / "iso2god"),
+        self.config(bin_extract_xiso=str(self.ferramenta("extract-xiso" if oficial else "extract-xiso-pt")),
+                    bin_iso2god=str(self.ferramenta("iso2god")),
                     pasta_padrao=str(self.dir))
         self.env = dict(os.environ, XMF_PIDS=str(self.pids), XMF_REGISTRO=str(self.registro),
                         NO_COLOR="1", PYTHONIOENCODING="utf-8")
         self.env.pop("XMF_SAIDA", None)
+        self.env.pop("XMF_NOME", None)
+
+    def ferramenta(self, nome):
+        """O caminho de uma das ferramentas falsas."""
+        return self.bin / (nome + ".cmd" if WINDOWS else nome)
 
     def config(self, **valores):
         caminho = self.app / "config.json"
@@ -115,7 +131,7 @@ class Ambiente:
         try:
             saida, erros = processo.communicate(timeout=prazo)
         except subprocess.TimeoutExpired:
-            os.killpg(processo.pid, signal.SIGKILL)
+            matar_arvore(processo)
             saida, erros = processo.communicate()
             raise AssertionError("o menu não terminou em %ss:\n%s\n%s"
                                  % (prazo, saida.decode("utf-8", "replace")[-3000:],
@@ -139,6 +155,23 @@ class Ambiente:
 
 def vivo(pid):
     """O processo ainda existe (e não é só um zumbi esperando o pai)?"""
+    if WINDOWS:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.OpenProcess.restype = wintypes.HANDLE
+        k32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        k32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        processo = k32.OpenProcess(0x1000, False, pid)     # QUERY_LIMITED_INFORMATION
+        if not processo:
+            return False
+        try:
+            codigo = wintypes.DWORD()
+            return bool(k32.GetExitCodeProcess(processo, ctypes.byref(codigo))) \
+                and codigo.value == 259                     # STILL_ACTIVE
+        finally:
+            k32.CloseHandle(processo)
     try:
         with open("/proc/%d/stat" % pid) as f:
             return f.read().split(") ", 1)[1][0] != "Z"
@@ -155,11 +188,60 @@ def esperar_morrer(pid, prazo=10):
     return False
 
 
+def link_de_pasta(link, alvo):
+    """Outro caminho para a mesma pasta: um link simbólico ou, no Windows
+    sem permissão para criar um, uma junção do NTFS."""
+    try:
+        os.symlink(alvo, link, target_is_directory=True)
+    except OSError:
+        if not WINDOWS:
+            raise
+        import _winapi
+        _winapi.CreateJunction(str(alvo), str(link))
+
+
+def janela_do_console(pid):
+    """Windows: a janela do console em que o processo roda (0 se não achar).
+    Só um processo preso a esse console a enxerga, então quem pergunta é um
+    Python à parte, que se solta do console dele e se prende ao do outro."""
+    codigo = ("import ctypes, sys\n"
+              "k = ctypes.WinDLL('kernel32')\n"
+              "k.GetConsoleWindow.restype = ctypes.c_void_p\n"
+              "k.FreeConsole()\n"
+              "print((k.AttachConsole(int(sys.argv[1])) and k.GetConsoleWindow()) or 0)\n")
+    r = subprocess.run([sys.executable, "-c", codigo, str(pid)],
+                       capture_output=True, text=True, timeout=30)
+    return int(r.stdout.strip() or 0)
+
+
+def fechar_janela(janela):
+    """Windows: fecha a janela como pelo X (WM_CLOSE)."""
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.PostMessageW.argtypes = (wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+    if not user32.PostMessageW(janela, 0x0010, 0, 0):
+        raise OSError(ctypes.get_last_error(), "PostMessageW falhou")
+
+
 def matar(pid):
     try:
-        os.kill(pid, signal.SIGKILL)
+        os.kill(pid, signal.SIGTERM if WINDOWS else signal.SIGKILL)
     except OSError:
         pass
+
+
+def matar_arvore(processo):
+    """Mata o menu e o que ele abriu (os testes o abrem numa sessão própria
+    no Unix; no Windows, o taskkill segue a árvore de processos)."""
+    if WINDOWS:
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(processo.pid)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        try:
+            os.killpg(processo.pid, signal.SIGKILL)
+        except OSError:
+            pass
 
 
 def carregar_modulo(ambiente):

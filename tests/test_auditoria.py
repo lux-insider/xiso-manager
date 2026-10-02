@@ -12,9 +12,16 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from apoio import Ambiente, carregar_modulo, esperar_morrer, matar, sem_cor, vivo  # noqa: E402
+from apoio import (WINDOWS, Ambiente, carregar_modulo, esperar_morrer, fechar_janela,  # noqa: E402
+                   janela_do_console, link_de_pasta, matar, matar_arvore, sem_cor, vivo)
 
 ORIGINAL = b"ISO ORIGINAL " * 1000
+
+# Os sinais do Unix (SIGTERM, SIGHUP, o Ctrl+C mandado ao grupo de processos)
+# e o terminal de controle não existem no Windows. Lá, o equivalente é fechar
+# a janela do console, testado em W1JanelaFechadaDeVerdade.
+CTRL_C_NO_GRUPO = unittest.skipIf(
+    WINDOWS, "o Ctrl+C é mandado ao grupo de processos (os.killpg), que só existe no Unix")
 
 
 class Base(unittest.TestCase):
@@ -52,7 +59,7 @@ class R1DestinoQueEhAMesmaPasta(Base):
     def setUp(self):
         super().setUp()
         self.atalho = self.amb.dir / "atalho"
-        self.atalho.symlink_to(self.jogos)
+        link_de_pasta(self.atalho, self.jogos)
 
     def reescrever(self, apagar):
         respostas = ["6", "c", str(self.atalho / "Halo.iso"), str(self.atalho)]
@@ -116,7 +123,7 @@ def terminar(processo, prazo=40):
     try:
         saida, erros = processo.communicate(timeout=prazo)
     except Exception:
-        os.killpg(processo.pid, signal.SIGKILL)
+        matar_arvore(processo)
         saida, erros = processo.communicate()
         raise AssertionError("o menu não terminou em %ss" % prazo)
     return processo.returncode, sem_cor(saida.decode("utf-8", "replace"))
@@ -137,11 +144,13 @@ class R3OficialInterrompido(Base):
         self.assertEqual(codigo, 0)
         return saida
 
+    @CTRL_C_NO_GRUPO
     def test_mesma_pasta(self):
         saida = self.ctrl_c()
         self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
         self.assertIn("o ISO original voltou ao nome de antes", saida)
 
+    @CTRL_C_NO_GRUPO
     def test_outra_pasta(self):
         destino = self.amb.dir / "otimizados"
         saida = self.ctrl_c(str(destino))
@@ -164,6 +173,7 @@ class R3OficialInterrompido(Base):
 GOD = ["1", "c", None, None, "", "", "", "", "", "0"]
 
 
+@unittest.skipIf(WINDOWS, "o SIGTERM é um sinal do Unix; no Windows o equivalente é fechar a janela (W-1)")
 class P1Sigterm(Base):
     """P-1: SIGTERM só para o menu (um `kill`, o desligamento). Antes, ele
     morria na hora e a ferramenta seguia convertendo escondida."""
@@ -190,7 +200,7 @@ class P1Sigterm(Base):
         self.assertEqual(codigo, -signal.SIGTERM)
 
     def test_reescrita_oficial_volta_ao_nome(self):
-        self.amb.config(bin_extract_xiso=str(self.amb.bin / "extract-xiso"))
+        self.amb.config(bin_extract_xiso=str(self.amb.ferramenta("extract-xiso")))
         processo = self.amb.iniciar(["6", "c", str(self.iso), "", "", "", "", "", "", "0"],
                                     env=LENTO)
         interromper(self.amb, processo, signal.SIGTERM, grupo=False)
@@ -199,6 +209,7 @@ class P1Sigterm(Base):
         self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
 
 
+@unittest.skipIf(WINDOWS, "o terminal de controle (pty) e o SIGHUP só existem no Unix")
 class P2TerminalFechado(Base):
     """P-2: fechar o terminal manda SIGHUP ao menu e à ferramenta. Antes, o
     menu morria na hora: as -pt limpavam sozinhas, mas a reescrita do
@@ -217,7 +228,7 @@ class P2TerminalFechado(Base):
         return processo.returncode, filho
 
     def test_reescrita_oficial_volta_ao_nome(self):
-        self.amb.config(bin_extract_xiso=str(self.amb.bin / "extract-xiso"))
+        self.amb.config(bin_extract_xiso=str(self.amb.ferramenta("extract-xiso")))
         codigo, filho = self.fechar_no_meio(["6", "c", str(self.iso), "", "", "", "", "", "", "0"])
         self.assertEqual(codigo, -signal.SIGHUP)
         self.assertFalse(vivo(filho))
@@ -248,6 +259,7 @@ class P2TerminalFechado(Base):
         self.assertEqual(processo.returncode, 0)
 
 
+@CTRL_C_NO_GRUPO
 class P3CtrlCComOPipeCheio(Base):
     """P-3: Ctrl+C no meio de uma listagem grande. Antes, o menu parava de
     ler a saída: a ferramenta ficava presa escrevendo no pipe cheio, sem
@@ -314,6 +326,58 @@ class W1JanelaFechadaNoWindows(Base):
         self.assertIsNone(xm._encerrar)
         self.assertEqual(len(xm._pendentes), 1)
 
+    @unittest.skipUnless(WINDOWS, "o tratador de console só existe no Windows")
+    def test_tratador_registrado_no_console(self):
+        """O tratador de verdade: registrado com SetConsoleCtrlHandler e
+        chamado pelo caminho do Windows (a função C que o ctypes monta)."""
+        import ctypes
+        xm = self.preparar(0.5)
+        xm._instalar_tratador_console()
+        self.assertIsNotNone(xm._tratador_console)
+        self.assertEqual(xm._tratador_console(0), 0, "Ctrl+C segue para o Python")
+        self.assertEqual(xm._tratador_console(2), 1, "janela fechada: tratado")
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
+        # tirar o tratador só dá certo se ele estava registrado
+        self.assertTrue(ctypes.windll.kernel32.SetConsoleCtrlHandler(xm._tratador_console, False))
+
+
+@unittest.skipUnless(WINDOWS, "fecha uma janela de console do Windows")
+class W1JanelaFechadaDeVerdade(Base):
+    """W-1 de ponta a ponta: o menu numa janela de console própria, no meio
+    de uma reescrita com o extract-xiso oficial (o falso também morre quando
+    a janela fecha, como o de verdade). A janela é fechada como pelo X: com
+    WM_CLOSE para a janela do console."""
+
+    oficial = True
+
+    def test_o_original_volta_ao_nome(self):
+        import subprocess
+        registro = self.amb.dir / "tela.txt"
+        tela = open(registro, "wb")
+        self.addCleanup(tela.close)
+        respostas = ["6", "c", str(self.iso), "", "", "", "", "", "", "0"]
+        processo = subprocess.Popen(
+            [sys.executable, str(self.amb.app / "xiso_manager.py")],
+            stdin=subprocess.PIPE, stdout=tela, stderr=subprocess.STDOUT,
+            env=dict(self.amb.env, **LENTO), creationflags=subprocess.CREATE_NEW_CONSOLE)
+        self.addCleanup(matar_arvore, processo)
+        processo.stdin.write("".join(r + "\n" for r in respostas).encode("utf-8"))
+        processo.stdin.flush()
+        filho = self.amb.esperar_ferramenta()[0]
+        time.sleep(0.5)
+        janela = janela_do_console(processo.pid)
+        self.assertTrue(janela, "não achei a janela do console do menu")
+        fechar_janela(janela)
+        try:
+            processo.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            self.fail("o menu não saiu depois de a janela fechar")
+        self.assertTrue(esperar_morrer(filho, 10), "a ferramenta não pode ficar rodando")
+        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"},
+                         registro.read_text(encoding="utf-8", errors="replace")[-2000:])
+        self.assertIn("Sessão encerrada",
+                      (self.amb.app / "xiso-manager.log").read_text(encoding="utf-8"))
+
 
 class P4FerramentaHerdaOTeclado(Base):
     """P-4: a ferramenta herdava a entrada do menu e podia ler o que o
@@ -371,6 +435,7 @@ class L1EventoComTipoErrado(Base):
         self.assertNotIn("inesperado", saida)
         self.assertIn("SHA1", saida)
 
+    @unittest.skipIf(WINDOWS, "no Windows não há SIGTERM para a ferramenta limpar: o menu a encerra")
     def test_se_a_leitura_falhar_a_ferramenta_nao_fica_rodando(self):
         xm = carregar_modulo(self.amb)
         def quebra(_evento):
@@ -382,7 +447,7 @@ class L1EventoComTipoErrado(Base):
         import contextlib
         import io
         with contextlib.redirect_stdout(io.StringIO()):
-            r = xm.executar([str(self.amb.bin / "iso2god"), "converter", "--progresso-json",
+            r = xm.executar([str(self.amb.ferramenta("iso2god")), "converter", "--progresso-json",
                              str(self.iso), str(self.amb.dir / "GOD")], "t")
         filho = self.amb.esperar_ferramenta()[0]
         self.addCleanup(matar, filho)
@@ -391,6 +456,7 @@ class L1EventoComTipoErrado(Base):
         self.assertIn("limpou", self.amb.registro_texto())
 
 
+@unittest.skipIf(WINDOWS, "a memória é medida com o módulo resource, que só existe no Unix")
 class L2LinhaEnorme(Base):
     """L-2: uma linha de 32 MiB sem quebra. Antes, 505 s e 407 MiB: cada
     pedaço lido era somado ao texto acumulado e varrido desde o começo."""
@@ -449,7 +515,7 @@ class L3AcentoPartido(Base):
     pedaço era decodificado sozinho e o caractere virava "��"."""
 
     def test_acento_inteiro(self):
-        r, _ = executar_aqui(self, [str(self.amb.bin / "extract-xiso-pt"), "listar", "x.iso"],
+        r, _ = executar_aqui(self, [str(self.amb.ferramenta("extract-xiso-pt")), "listar", "x.iso"],
                              {"XMF_SAIDA": "utf8_partido", "XMF_PASSOS": "0"})
         linhas = [l for l in r.saida if l.endswith("fim")]
         self.assertEqual(linhas, ["a" * 4095 + "çé fim"])
@@ -462,7 +528,7 @@ class L4MensagemDoVerificarUmaVezSo(Base):
     MENSAGEM = "a imagem está truncada: termina no setor 1000, o volume declara 2000"
 
     def verificar(self, env):
-        r, _ = executar_aqui(self, [str(self.amb.bin / "extract-xiso-pt"), "verificar",
+        r, _ = executar_aqui(self, [str(self.amb.ferramenta("extract-xiso-pt")), "verificar",
                                     str(self.iso), "--progresso-json"], dict(env, XMF_FALHAR="1"))
         return [l for l in r.saida if self.MENSAGEM in l]
 
@@ -518,7 +584,7 @@ class L6TextoDaIsoCruNoTerminal(Base):
         self.assertIn("fim", linha)
 
     def test_linha_de_saida(self):
-        r, _ = executar_aqui(self, [str(self.amb.bin / "extract-xiso-pt"), "listar", "x.iso"],
+        r, _ = executar_aqui(self, [str(self.amb.ferramenta("extract-xiso-pt")), "listar", "x.iso"],
                              {"XMF_SAIDA": "controle", "XMF_PASSOS": "0"})
         linha = [l for l in r.saida if "título" in l][0]
         for p in PERIGOSOS:
@@ -528,6 +594,7 @@ class L6TextoDaIsoCruNoTerminal(Base):
 
 # ── 4. Configuração e entrada ───────────────────────────────────────────────
 
+@unittest.skipIf(WINDOWS, "nome de arquivo que não é UTF-8 só existe no Unix (no Windows os nomes são UTF-16)")
 class A1NomeQueNaoEhUtf8(Base):
     """A-1: um nome de arquivo gravado em Latin-1 ("Ação" = 41 E7 E3 6F),
     comum em cópias vindas do Windows. Com o terminal em UTF-8 estrito (o
@@ -599,7 +666,10 @@ class C1ConfigRegravadoNoLugar(Base):
     def test_formato_e_link_continuam(self):
         guardado = self.amb.dir / "guardado.json"
         (self.amb.app / "config.json").rename(guardado)
-        (self.amb.app / "config.json").symlink_to(guardado)
+        try:
+            (self.amb.app / "config.json").symlink_to(guardado)
+        except OSError as e:                # Windows sem permissão para criar link
+            self.skipTest("não deu para criar o link: %s" % e)
         xm = carregar_modulo(self.amb)
         xm.set_cfg("threads_god", 9)
         self.assertTrue((self.amb.app / "config.json").is_symlink())
@@ -627,6 +697,7 @@ class C2NuloNoConfig(Base):
             self.assertEqual(xm._validar_config(chave, "/a/b"), "/a/b")
 
 
+@CTRL_C_NO_GRUPO
 class E1CtrlCNaConfirmacao(Base):
     """E-1: Ctrl+C em "Confirmar? [S/n]" valia a resposta padrão, "sim": a
     operação começava. Agora vale "não"."""
