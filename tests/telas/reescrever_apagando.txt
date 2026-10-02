@@ -81,7 +81,7 @@
   ── 4/4 · Verificação ───────────────────────────────────────────
   📁 Destino       <BASE>/jogos
   📦 Necessário    0.05 MiB  (com margem: 0.06 MiB)
-  💾 Disponível    ##.## GiB   Total: ###.## GiB
+  💾 Disponível #.## GiB   Total: #.## GiB
   📊 Uso atual     <BARRA> ##.#%
   ✓  Espaço suficiente.
 

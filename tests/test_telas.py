@@ -44,7 +44,9 @@ def normalizar(texto):
             linha = re.sub(r"\d", "#", linha)
             linha = re.sub(r"[\u2588\u2591]+", "<BARRA>", linha)
         linhas.append(linha.rstrip())
-    return "\n".join(linhas)
+    # o espaço livre muda de máquina para máquina, inclusive em quantos
+    # dígitos tem (95 GiB ou 190 GiB): a largura do número também é ignorada
+    return re.sub(r" *#+\.## GiB", " #.## GiB", "\n".join(linhas))
 
 
 class Telas(unittest.TestCase):
