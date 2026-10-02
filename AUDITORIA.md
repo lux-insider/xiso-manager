@@ -89,11 +89,11 @@ vetar se discordar.
 | P-4 | Baixa | `xiso_manager.py:1787` | a ferramenta herda a entrada do terminal e pode disputar o teclado com o menu | corrigido |
 | W-2 | Média | `xiso_manager.py:1650, 3273` | a saída do `info --json` é lida na codificação padrão do sistema: rodando o `.py` direto no Windows, o título "Jogo de Ação" vira "Jogo de AÃ§Ã£o"; num Linux com `LANG=C`, a análise falha | corrigido (achado pelo CI no Windows) |
 | W-3 | Baixa | `xiso_manager.py:241-258` | o log é gravado na codificação padrão do sistema e lido como UTF-8: rodando o `.py` direto no Windows, "Ver log" mostra "Sess�o iniciada" | corrigido (achado pelo CI no Windows) |
-| V-1 | Média | `xiso_manager.py:2997-3006` | assistente com o extract-xiso oficial: ISO de Xbox clássico cai em "Não consegui identificar" | **só descrito** (muda a tela) |
+| V-1 | Média | `xiso_manager.py:2997-3006` | assistente com o extract-xiso oficial: ISO de Xbox clássico cai em "Não consegui identificar" | corrigido depois (pedido) |
 | V-2 | Média | `xiso_manager.py:2326, 2490, 2596` | o extract-xiso oficial grava por cima sem perguntar (extrair, criar, reescrever para outra pasta) | corrigido depois (pedido) |
 | V-3 | Baixa | `xiso_manager.py:1916-1918, 1930-1932` | Ctrl+C nas outras perguntas devolve a resposta padrão e o fluxo segue | **só descrito** (muda o fluxo) |
 | V-4 | Baixa | `windows/lancador/src/main.rs:69-75` | erro fatal do programa (código 1) no Windows: a janela fecha antes de dar para ler | corrigido depois (pedido) |
-| V-5 | Baixa | `xiso_manager.py:141-158` | `config.json` ilegível vira o padrão sem aviso e é regravado na próxima mudança | **só descrito** (aviso novo) |
+| V-5 | Baixa | `xiso_manager.py:141-158` | `config.json` ilegível vira o padrão sem aviso e é regravado na próxima mudança | corrigido depois (pedido) |
 | V-6 | Baixa | — | Windows: `taskkill /F` no menu deixa a ferramenta órfã | **só descrito** |
 | D-1 | — | pacote Windows | o Python portátil poderia encolher de 24,6 MB para 8,7 MB | **só descrito** (pedido) |
 | D-2 | Baixa | `xiso_manager.py:1272-1273` | antes de começar, o menu mede a pasta de destino inteira (no GOD, pode ser a raiz de um HD) | **só descrito** |
@@ -510,6 +510,11 @@ mostra a dica de tipo certa e logo em seguida "Não consegui identificar", com
 a lista genérica de ações no lugar da lista certa. Corrigir muda a tela do
 assistente.
 
+*Corrigido depois, a pedido* (`xiso_manager.py:3459`): a lista genérica e o
+"Não consegui identificar" ficam só para o tipo que não foi identificado, e
+o "Verificar" entra depois, só com o extract-xiso-pt (o oficial não tem).
+Com o extract-xiso-pt, a tela do assistente é a mesma de antes.
+
 ### V-2 (Média) — o extract-xiso oficial grava por cima sem perguntar
 
 `xiso_manager.py:2326, 2490, 2596`. Com o extract-xiso-pt, o menu pergunta
@@ -565,6 +570,14 @@ sem aviso, e na próxima mudança é regravado: os caminhos configurados se
 perdem. A correção seria guardar uma cópia (`config.json.invalido`) e avisar;
 é um aviso novo.
 
+*Corrigido depois, a pedido* (`xiso_manager.py:164, 191, 205`): um
+`config.json` com JSON inválido, que não é um objeto ou que não é UTF-8 é
+copiado inteiro para `config.json.invalido`, ao lado, e na abertura o menu
+avisa e espera o ENTER: "Não consegui ler o config.json: as configurações
+voltaram ao padrão." e "O arquivo antigo ficou em <caminho>". O log também
+registra. Um erro de leitura do disco continua como antes (o padrão, sem
+aviso).
+
 ### V-6 (Baixa) — `taskkill /F` no Windows
 
 Matar o menu à força no Windows deixa a ferramenta órfã, sem pai e sem
@@ -581,7 +594,10 @@ antes dava errado. Se discordar de alguma, é só dizer qual.
 
 Depois, a pedido, o V-2 e o V-4: uma pergunta e uma pausa que já existiam
 passam a aparecer em mais casos, e o lançador ganhou uma linha nova, só para
-uma queda do Python (as duas últimas linhas da tabela).
+uma queda do Python. Depois deles, o V-1 e o V-5: o assistente com o
+extract-xiso oficial passa a mostrar a lista certa, e um `config.json`
+ilegível ganha um aviso novo, de duas linhas (as quatro últimas linhas da
+tabela).
 
 | Item | Caso | Antes | Agora |
 |---|---|---|---|
@@ -610,6 +626,8 @@ uma queda do Python (as duas últimas linhas da tabela).
 | W-1 | janela fechada no Windows | — | nada (a janela já fechou) |
 | V-2 | extrair, criar ou reescrever para outra pasta com o extract-xiso oficial, com o destino já ocupado | gravava por cima, sem perguntar | "… já tem arquivos. Extrair por cima?" ou "… já existe. Substituir?", como com o extract-xiso-pt; com "não", "pulado" |
 | V-4 | erro fatal do programa com a janela aberta com dois cliques | a janela fechava na hora | "Aperte ENTER para fechar..."; numa queda do Python, antes disso, "xiso-manager: o Python fechou com erro (código 0x…)." |
+| V-1 | assistente com o extract-xiso oficial e uma ISO de Xbox clássico | a dica certa e logo depois "Não consegui identificar", com extrair, listar e converter para GOD | só a dica certa, com extrair, listar e reescrever |
+| V-5 | `config.json` ilegível | nada: as configurações voltavam ao padrão, e a próxima mudança apagava o arquivo antigo | na abertura, "Não consegui ler o config.json: as configurações voltaram ao padrão." e "O arquivo antigo ficou em <caminho>/config.json.invalido", esperando o ENTER |
 
 ## Resultado da fase 2
 
@@ -684,3 +702,22 @@ A pedido, os dois itens que mais pesavam entre os só descritos:
   console próprio, como aberto com dois cliques: com erro, ele espera o
   ENTER e sai com 1; com 0 e 130, fecha na hora; rodado de dentro de um
   `cmd.exe`, não espera.
+
+## V-1 e V-5, corrigidos depois
+
+Também a pedido, depois da 3.2.8:
+
+- **V-1:** 1 teste novo (`V1AssistenteComOOficial`): com o extract-xiso
+  oficial, uma ISO de Xbox clássico mostra só a dica certa e as ações
+  extrair, listar e reescrever, sem "Não consegui identificar", sem
+  converter para GOD e sem o verificar. Falha na 3.2.8. A tela gravada do
+  assistente (com o extract-xiso-pt) não mudou.
+- **V-5:** 2 testes novos (`V5ConfigIlegivel`): JSON inválido, um JSON que
+  não é objeto e bytes que não são UTF-8 viram a cópia `config.json.invalido`
+  com os mesmos bytes, o aviso na tela e a linha no log; um `config.json`
+  válido não avisa nem copia. O primeiro falha na 3.2.8.
+
+O que continua só descrito no xiso-manager: V-3 (Ctrl+C nas outras
+perguntas, Baixa), V-6 (`taskkill /F` no Windows, Baixa, sem uma correção
+que não piore outro caso) e D-1 a D-3 (tamanho do pacote e desempenho).
+Nenhum deles põe arquivo em risco.
