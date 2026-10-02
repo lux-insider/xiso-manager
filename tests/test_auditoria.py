@@ -757,5 +757,24 @@ class E3DigitosQueNaoSaoDeZeroANove(Base):
             self.assertNotIn("Erro inesperado", saida, entradas)
 
 
+# ── Codificação: o Python fora do modo UTF-8 ────────────────────────────────
+
+# A codificação padrão deixa de ser UTF-8: num Linux com LANG=C, ASCII; no
+# Windows, sem o modo UTF-8 que o lançador do pacote liga, cp1252. É o caso
+# de quem roda o xiso_manager.py direto no Windows.
+SEM_UTF8 = {"LANG": "C", "LC_ALL": "C", "PYTHONUTF8": "0"}
+
+
+class W2InfoEmUtf8(Base):
+    """W-2: o `info --json` do iso2god sai em UTF-8, mas o menu o lia na
+    codificação padrão do sistema: no Windows o título "Jogo de Ação" virava
+    "Jogo de AÃ§Ã£o"; num Linux com LANG=C, a análise falhava."""
+
+    def test_titulo_com_acento(self):
+        codigo, saida, erros = self.amb.rodar(["2", "c", str(self.iso), "", "0"], env=SEM_UTF8)
+        self.assertEqual(codigo, 0, erros)
+        self.assertIn("Jogo de Ação", sem_cor(saida))
+
+
 if __name__ == "__main__":
     unittest.main()

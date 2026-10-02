@@ -1648,7 +1648,8 @@ def iso2god_proprio(binario=None):
     if binario not in _ISO2GOD_PROPRIO:
         try:
             ajuda = subprocess.run([binario, "--help"], stdin=subprocess.DEVNULL,
-                                   capture_output=True, text=True, timeout=10).stdout
+                                   capture_output=True, encoding="utf-8", errors="replace",
+                                   timeout=10).stdout
         except Exception:
             ajuda = ""
         _ISO2GOD_PROPRIO[binario] = "converter" in ajuda and "info" in ajuda
@@ -3270,8 +3271,11 @@ def mostrar_info_iso2god(arquivo):
     cmd = [bin_god(), "info", "--json", arquivo]
     log_evento("info", "cmd: " + " ".join(cmd))
     try:
+        # O iso2god escreve em UTF-8. Na codificação padrão do sistema (cp1252
+        # no Windows, fora do modo UTF-8 do pacote) o título acentuado virava
+        # "AÃ§Ã£o", e num Linux com LANG=C a análise falhava.
         r = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True,
-                           text=True, timeout=300)
+                           encoding="utf-8", errors="replace", timeout=300)
     except Exception as e:
         erro(str(e))
         return False
