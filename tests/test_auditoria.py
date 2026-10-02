@@ -12,8 +12,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from apoio import (WINDOWS, Ambiente, carregar_modulo, esperar_morrer, fechar_janela,  # noqa: E402
-                   janela_do_console, link_de_pasta, matar, matar_arvore, sem_cor, vivo)
+from apoio import (WINDOWS, Ambiente, ConsoleProprio, carregar_modulo,  # noqa: E402
+                   esperar_morrer, link_de_pasta, matar, matar_arvore, sem_cor, vivo)
 
 ORIGINAL = b"ISO ORIGINAL " * 1000
 
@@ -343,35 +343,26 @@ class W1JanelaFechadaNoWindows(Base):
 
 @unittest.skipUnless(WINDOWS, "fecha uma janela de console do Windows")
 class W1JanelaFechadaDeVerdade(Base):
-    """W-1 de ponta a ponta: o menu numa janela de console própria, no meio
-    de uma reescrita com o extract-xiso oficial (o falso também morre quando
-    a janela fecha, como o de verdade). A janela é fechada como pelo X: com
-    WM_CLOSE para a janela do console."""
+    """W-1 de ponta a ponta: o menu num console próprio, no meio de uma
+    reescrita com o extract-xiso oficial (o falso também morre quando o
+    console fecha, como o de verdade), e o console é fechado como a janela
+    pelo X: o Windows manda CTRL_CLOSE_EVENT ao menu e à ferramenta."""
 
     oficial = True
 
     def test_o_original_volta_ao_nome(self):
-        import subprocess
         registro = self.amb.dir / "tela.txt"
         tela = open(registro, "wb")
         self.addCleanup(tela.close)
-        respostas = ["6", "c", str(self.iso), "", "", "", "", "", "", "0"]
-        processo = subprocess.Popen(
-            [sys.executable, str(self.amb.app / "xiso_manager.py")],
-            stdin=subprocess.PIPE, stdout=tela, stderr=subprocess.STDOUT,
-            env=dict(self.amb.env, **LENTO), creationflags=subprocess.CREATE_NEW_CONSOLE)
-        self.addCleanup(matar_arvore, processo)
-        processo.stdin.write("".join(r + "\n" for r in respostas).encode("utf-8"))
-        processo.stdin.flush()
+        console = ConsoleProprio([sys.executable, str(self.amb.app / "xiso_manager.py")],
+                                 dict(self.amb.env, **LENTO), tela)
+        self.addCleanup(lambda: matar_arvore(console))
+        console.digitar(["6", "c", str(self.iso), "", "", "", "", "", "", "0"])
         filho = self.amb.esperar_ferramenta()[0]
         time.sleep(0.5)
-        janela = janela_do_console(processo.pid)
-        self.assertTrue(janela, "não achei a janela do console do menu")
-        fechar_janela(janela)
-        try:
-            processo.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            self.fail("o menu não saiu depois de a janela fechar")
+        console.fechar()
+        if not console.esperar(30):
+            self.fail("o menu não saiu depois de o console fechar")
         self.assertTrue(esperar_morrer(filho, 10), "a ferramenta não pode ficar rodando")
         self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"},
                          registro.read_text(encoding="utf-8", errors="replace")[-2000:])
@@ -747,8 +738,13 @@ class E3DigitosQueNaoSaoDeZeroANove(Base):
     def test_selecao(self):
         xm = carregar_modulo(self.amb)
         enorme = "1" * 5000
+        try:
+            int(enorme)                     # antes do 3.11 o int não tinha limite
+            esperado = ([1, 2, 0], ["²", "1-²", enorme, "4-" + enorme])
+        except ValueError:
+            esperado = ([0], ["²", "1-²", enorme, "2-" + enorme])
         self.assertEqual(xm._expandir_selecao("², 1-², %s, 2-%s, 1" % (enorme, enorme), 3),
-                         ([0], ["²", "1-²", enorme, "2-" + enorme]))
+                         esperado)
         self.assertEqual(xm._expandir_selecao("٣", 3), ([2], []))
 
     def test_menus_de_escolha(self):

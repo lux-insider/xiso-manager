@@ -10,7 +10,9 @@ durações, velocidades e o espaço livre do disco.
 
 No Windows as mesmas telas valem: a pasta base tem o mesmo comprimento da
 do Linux (as linhas longas são cortadas no mesmo ponto), as barras dos
-caminhos são trocadas por "/" e o ".cmd" das ferramentas falsas sai do nome.
+caminhos são trocadas por "/" e o ".cmd" das ferramentas falsas sai do nome
+(com o corte que ele causa na tela de configurações, que mostra no máximo
+34 caracteres do caminho).
 
 Para regravar (só de propósito, explicando no commit o que mudou):
     XM_GRAVAR_TELAS=1 python3 -m unittest tests.test_telas
@@ -39,7 +41,7 @@ def normalizar(texto):
     texto = texto.replace("\r\n", "\n").replace(str(BASE), "<BASE>")
     if WINDOWS:
         texto = texto.replace("\\", "/")
-        texto = re.sub(r"(<BASE>/bin/[\w-]+)\.cmd\b", r"\1", texto)
+        texto = re.sub(r"(<BASE>/bin/[\w-]+)(\.cmd\b|…)", r"\1", texto)
     # um caminho cortado logo no começo da pasta base ("/t…" ou "C:…")
     texto = re.sub(r"(?<!\S)(\S+)…",
                    lambda m: "<BASE>…" if str(BASE).replace("\\", "/").startswith(m.group(1))
@@ -65,8 +67,6 @@ class Telas(unittest.TestCase):
     def preparar(self, oficial=False):
         self.amb = Ambiente("telas", oficial=oficial, pasta=BASE)
         self.addCleanup(self.amb.limpar)
-        casa = BASE / "casa"
-        casa.mkdir()
         self.trabalho = BASE / "trabalho"
         self.trabalho.mkdir()
         self.jogos = BASE / "jogos"
@@ -77,8 +77,6 @@ class Telas(unittest.TestCase):
         (jogo / "default.xbe").write_bytes(b"XBEH" + b"\0" * 4000)
         (jogo / "dados.bin").write_bytes(b"d" * 9000)
         self.amb.config(pasta_padrao=str(self.jogos))
-        self.amb.env["HOME"] = str(casa)
-        self.amb.env["USERPROFILE"] = str(casa)     # a pasta pessoal no Windows
         self.amb.env["XMF_PAUSA"] = "0"
         (BASE / "app" / "xiso-manager.log").unlink(missing_ok=True)
 
