@@ -148,14 +148,14 @@ class Ambiente:
         limite = time.time() + prazo
         while time.time() < limite:
             if self.pids.exists():
-                pids = [int(l) for l in self.pids.read_text().split()]
+                pids = [int(l) for l in self.pids.read_text(encoding="utf-8").split()]
                 if len(pids) >= quantas:
                     return pids
             time.sleep(0.02)
         raise AssertionError("a ferramenta falsa não começou em %ss" % prazo)
 
     def registro_texto(self):
-        return self.registro.read_text() if self.registro.exists() else ""
+        return self.registro.read_text(encoding="utf-8") if self.registro.exists() else ""
 
 
 def vivo(pid):
