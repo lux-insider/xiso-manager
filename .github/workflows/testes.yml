@@ -22,7 +22,7 @@ env:
   # O Python portátil oficial ("embeddable", de python.org) do pacote do
   # Windows. Ao trocar a versão, troque também o SHA-256: a primeira execução
   # com a versão nova mostra o valor no passo "Baixar o Python portátil".
-  PYTHON_PORTATIL: "3.14.0"
+  PYTHON_PORTATIL: "3.14.7"
   PYTHON_PORTATIL_SHA256: ""
 
 jobs:
