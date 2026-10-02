@@ -130,6 +130,9 @@ CONFIG_PADRAO = {
 }
 
 _config = dict(CONFIG_PADRAO)
+# None: o config.json foi lido (ou não existe). Senão, ele não pôde ser lido,
+# e aqui fica onde a cópia dele foi guardada ("" se nem a cópia deu certo).
+_config_ilegivel = None
 
 
 def _validar_config(chave, valor):
@@ -159,23 +162,55 @@ def _validar_config(chave, valor):
 
 
 def carregar_config():
-    global _config
+    global _config, _config_ilegivel
     _config = dict(CONFIG_PADRAO)
+    _config_ilegivel = None
     try:
-        if ARQ_CONFIG.is_file():
+        if not ARQ_CONFIG.is_file():
+            return _config
+        try:
             with open(ARQ_CONFIG, "r", encoding="utf-8") as f:
                 dados = json.load(f)
-            if isinstance(dados, dict):
-                for chave in CONFIG_PADRAO:
-                    if chave in dados:
-                        _config[chave] = _validar_config(chave, dados[chave])
-                # chave que não existe mais (ex.: bin_xgdtool das versões
-                # antigas): regrava o arquivo sem ela
-                if set(dados) - set(CONFIG_PADRAO):
-                    salvar_config()
+            if not isinstance(dados, dict):
+                raise ValueError("não é um objeto JSON")
+        except ValueError as e:     # JSON inválido ou bytes que não são UTF-8
+            _guardar_config_ilegivel(e)
+            return _config
+        for chave in CONFIG_PADRAO:
+            if chave in dados:
+                _config[chave] = _validar_config(chave, dados[chave])
+        # chave que não existe mais (ex.: bin_xgdtool das versões
+        # antigas): regrava o arquivo sem ela
+        if set(dados) - set(CONFIG_PADRAO):
+            salvar_config()
     except Exception:
         pass
     return _config
+
+
+def _guardar_config_ilegivel(motivo):
+    """Um config.json que não dá para ler volta ao padrão, e a próxima
+    mudança o regravaria: antes disso, o arquivo vai inteiro para
+    config.json.invalido, para os caminhos configurados não se perderem."""
+    global _config_ilegivel
+    copia = str(ARQ_CONFIG.with_name(ARQ_CONFIG.name + ".invalido"))
+    try:
+        shutil.copyfile(ARQ_CONFIG, copia)
+    except OSError:
+        copia = ""
+    _config_ilegivel = copia
+    log_evento("aviso", f"config.json ilegível ({motivo}); cópia: {copia or 'não foi possível'}")
+
+
+def avisar_config_ilegivel():
+    """Na abertura: diz que as configurações voltaram ao padrão e onde
+    ficou o arquivo antigo."""
+    if _config_ilegivel is None:
+        return
+    aviso(t("config_ilegivel"))
+    if _config_ilegivel:
+        print(cor("  %s %s" % (t("config_copia"), encurtar_home(_config_ilegivel)), C.CINZA))
+    pausar()
 
 
 def salvar_config():
@@ -890,6 +925,8 @@ TEXTOS = {
     "pt": {
         "escolha": "Escolha uma opção",
         "opcao_invalida": "Opção inválida. Tente novamente.",
+        "config_ilegivel": "Não consegui ler o config.json: as configurações voltaram ao padrão.",
+        "config_copia": "O arquivo antigo ficou em",
         "enter_continuar": "Pressione ENTER para continuar",
         "cancelado": "Operação cancelada pelo usuário.",
         "confirmar": "Confirmar?",
@@ -1094,6 +1131,8 @@ TEXTOS = {
     "en": {
         "escolha": "Choose an option",
         "opcao_invalida": "Invalid option. Try again.",
+        "config_ilegivel": "Could not read config.json: settings were reset to the defaults.",
+        "config_copia": "The old file was kept at",
         "enter_continuar": "Press ENTER to continue",
         "cancelado": "Operation cancelled by the user.",
         "confirmar": "Confirm?",
@@ -3845,6 +3884,7 @@ def main():
     carregar_config()
     log_evento("info", "=" * 30)
     log_evento("info", f"Sessão iniciada — {APP_NOME} v{APP_VERSAO}")
+    avisar_config_ilegivel()
 
     resolver_binarios(interativo=True)
 
