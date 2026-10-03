@@ -105,35 +105,7 @@ Se o binário existir mas não for executável, ele tenta o `chmod +x` sozinho.
 
 ## Menu
 
-```
-╭────────────────────────────────────────────────────╮
-│ 💿  xiso-manager  ·  v3.2.9                        │
-╰────────────────────────────────────────────────────╯
-
-  ✓ extract-xiso-pt pronto
-  ✓ iso2god        pronto
-
-──────────────────────────────────────────────────────
-
-  ── Xbox 360 ─────────────────────────────── iso2god ──
-   [1]  🎮  Converter ISO para GOD
-   [2]  🔍  Analisar ISO sem converter
-  ── Os dois consoles ──────────────── extract-xiso-pt ──
-   [3]  📦  Extrair conteúdo de ISO
-   [4]  📋  Listar arquivos dentro do ISO
-   [5]  🛠️  Criar ISO a partir de uma pasta
-   [6]  🔄  Reescrever / otimizar ISO
-   [v]  🔍  Verificar integridade do ISO
-  ── Geral ─────────────────────────────────────────────
-   [7]  🧭  Assistente (detecta o ISO e sugere o que fazer)
-   [8]  🚀  Lote: processar uma pasta inteira
-   [9]  ⌨️  Comando manual (avançado)
-   [c]  ⚙️  Configurações
-   [l]  🧾  Ver log de execução
-   [s]  📖  Sobre / ajuda
-
-   [0]  🚪  Sair
-```
+![Menu do xiso-manager 3.2.9 no terminal](docs/menu.png)
 
 Nada de comando pra decorar — é tudo número. O único texto que você digita é a
 pasta de destino.
