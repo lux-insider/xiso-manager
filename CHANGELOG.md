@@ -185,6 +185,5 @@ sentido.
 
 Os pacotes de Linux dessas versões incluíam o build oficial, sem modificação,
 do [extract-xiso](https://github.com/XboxDev/extract-xiso), distribuído sob a
-sua licença BSD; o texto da licença está nas páginas dessas releases. A
-partir da 3.2.0 o programa usa o extract-xiso-pt e não distribui mais o
-extract-xiso.
+sua licença BSD, com o texto da licença junto. A partir da 3.2.0 o programa
+usa o extract-xiso-pt e não distribui mais o extract-xiso.
