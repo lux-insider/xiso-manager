@@ -1,7 +1,37 @@
 # xiso-manager
 
-Gerenciador interativo para **extract-xiso-pt** (ISOs de Xbox e Xbox 360) e **iso2god** (Xbox 360 → GOD).
-Um arquivo só, sem dependência nenhuma além do Python que já vem no Linux.
+[![Versão](https://img.shields.io/github/v/release/lux-insider/xiso-manager?label=vers%C3%A3o)](https://github.com/lux-insider/xiso-manager/releases/latest)
+[![Testes](https://github.com/lux-insider/xiso-manager/actions/workflows/testes.yml/badge.svg)](https://github.com/lux-insider/xiso-manager/actions/workflows/testes.yml)
+[![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)](LICENSE)
+![Plataformas](https://img.shields.io/badge/plataformas-Windows%20%7C%20Linux-informational)
+![Python](https://img.shields.io/badge/Python-3.8%2B-yellow)
+
+Gerenciador interativo, em português, para imagens ISO de **Xbox** e
+**Xbox 360**. Reúne num menu só o
+[extract-xiso-pt](https://github.com/lux-insider/extract-xiso-pt) (extrair,
+listar, criar, reescrever e verificar) e o
+[iso2god-pt](https://github.com/lux-insider/iso2god-pt) (conversão para GOD).
+Detecta o console de cada ISO e só oferece as ações que fazem sentido. É um
+arquivo Python só, sem bibliotecas externas.
+
+![Menu do xiso-manager no terminal](docs/menu.png)
+
+---
+
+## Sumário
+
+- [Instalação](#instalação)
+- [Menu e opções](#o-que-cada-opção-faz)
+- [Onde os arquivos são salvos](#onde-os-arquivos-são-salvos)
+- [Detecção do tipo de ISO](#detecção-do-tipo-de-iso)
+- [Barra de progresso](#barra-de-progresso)
+- [Segurança](#segurança)
+- [Configuração e arquivos](#estrutura-da-pasta)
+- [Códigos de retorno](#códigos-de-retorno)
+- [Problemas comuns](#problemas-comuns)
+- [Testes](#testes)
+- [Documentação](#documentação)
+- [Licença](#licença)
 
 ---
 
@@ -41,7 +71,7 @@ Depois `source ~/.bashrc` uma vez. Daí em diante é só `xiso`.
 
 ### Windows
 
-Baixe o `xiso-manager-3.2.9-windows-x64.zip` da página de
+Baixe o `xiso-manager-<versão>-windows-x64.zip` da página de
 [Releases](https://github.com/lux-insider/xiso-manager/releases), descompacte a
 pasta inteira e dê dois cliques em **`xiso-manager.exe`**. Roda no Windows 10/11
 (64 bits) sem instalar nada: a pasta já traz tudo.
@@ -105,10 +135,8 @@ Se o binário existir mas não for executável, ele tenta o `chmod +x` sozinho.
 
 ## Menu
 
-![Menu do xiso-manager 3.2.9 no terminal](docs/menu.png)
-
-Nada de comando pra decorar — é tudo número. O único texto que você digita é a
-pasta de destino.
+Nada de comando para decorar: as opções são escolhidas por número. O único
+texto digitado é a pasta de destino.
 
 ---
 
@@ -267,18 +295,29 @@ Python 3.8+, `extract-xiso-pt` e `iso2god`. Nenhuma biblioteca externa.
 
 ---
 
-## Créditos
+## Testes
 
-- **extract-xiso-pt** e **iso2god em Rust (português)** — de lux-insider, o
-  mesmo autor do xiso-manager.
-- **[extract-xiso](https://github.com/XboxDev/extract-xiso)** — escrito
-  originalmente por *in* (in@fishtank.com) e mantido pela comunidade XboxDev.
-  As versões até a 3.1.1 do xiso-manager usavam e distribuíam o build oficial
-  dele; a partir da 3.2.0 o padrão é o extract-xiso-pt, e o oficial continua
-  aceito se você configurar o caminho.
+- Testes automáticos das telas do menu, de cada operação e dos achados da
+  auditoria (`tests/`), com ferramentas simuladas para cobrir falhas e
+  cancelamentos.
+- **Integração contínua** no GitHub Actions, no Linux e no Windows: menu em
+  Python 3.8 a 3.14, `xiso-manager.exe` e o pacote com o Python portátil.
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+---
+
+## Documentação
+
+| Documento | Conteúdo |
+|---|---|
+| [CHANGELOG.md](CHANGELOG.md) | histórico de versões |
+| [AUDITORIA.md](AUDITORIA.md) | auditoria de segurança e confiabilidade, com cada achado e sua correção |
 
 ---
 
 ## Licença
 
-MIT — veja [LICENSE](LICENSE).
+Código sob a licença [MIT](LICENSE).
