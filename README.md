@@ -4,7 +4,7 @@
 [![Testes](https://github.com/lux-insider/xiso-manager/actions/workflows/testes.yml/badge.svg)](https://github.com/lux-insider/xiso-manager/actions/workflows/testes.yml)
 [![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)](LICENSE)
 ![Plataformas](https://img.shields.io/badge/plataformas-Windows%20%7C%20Linux-informational)
-![Python](https://img.shields.io/badge/Python-3.8%2B-yellow)
+![Rust](https://img.shields.io/badge/Rust-2024-orange)
 
 Gerenciador interativo, em português, para imagens ISO de **Xbox** e
 **Xbox 360**. Reúne num menu só o
@@ -12,7 +12,7 @@ Gerenciador interativo, em português, para imagens ISO de **Xbox** e
 listar, criar, reescrever e verificar) e o
 [iso2god-pt](https://github.com/lux-insider/iso2god-pt) (conversão para GOD).
 Detecta o console de cada ISO e só oferece as ações que fazem sentido. É um
-arquivo Python só, sem bibliotecas externas.
+programa só, em Rust: não precisa instalar nada.
 
 ![Menu do xiso-manager no terminal](docs/menu.png)
 
@@ -37,15 +37,27 @@ arquivo Python só, sem bibliotecas externas.
 
 ## Instalação
 
-A ferramenta é autocontida: tudo mora numa pasta só.
+A ferramenta é autocontida: tudo mora numa pasta só. Baixe o `xiso-manager`
+para Linux x86_64 da página de
+[Releases](https://github.com/lux-insider/xiso-manager/releases) e deixe numa
+pasta só dele:
 
 ```bash
-git clone https://github.com/lux-insider/xiso-manager.git ~/Ferramentas/xiso-manager
-chmod +x ~/Ferramentas/xiso-manager/xiso_manager.py
+mkdir -p ~/Ferramentas/xiso-manager
+mv ~/Downloads/xiso-manager ~/Ferramentas/xiso-manager/
+chmod +x ~/Ferramentas/xiso-manager/xiso-manager
+```
+
+Ou compile a partir do código (Rust 1.88 ou mais novo):
+
+```bash
+git clone https://github.com/lux-insider/xiso-manager.git
+cd xiso-manager && cargo build --release
+cp target/release/xiso-manager ~/Ferramentas/xiso-manager/
 ```
 
 Ele usa duas ferramentas externas. As duas, para Linux x86_64 (glibc 2.34+),
-estão prontas na página de
+também estão na página de
 [Releases](https://github.com/lux-insider/xiso-manager/releases):
 
 - **extract-xiso-pt** — [lux-insider/extract-xiso-pt](https://github.com/lux-insider/extract-xiso-pt):
@@ -62,12 +74,10 @@ continua funcionando: aponte o caminho dele em **Configurações** e o menu volt
 Para chamar de qualquer lugar, adicione ao `~/.bashrc`:
 
 ```bash
-alias xiso='~/Ferramentas/xiso-manager/xiso_manager.py'
+alias xiso='~/Ferramentas/xiso-manager/xiso-manager'
 ```
 
 Depois `source ~/.bashrc` uma vez. Daí em diante é só `xiso`.
-
-> É script Python, não função de shell — use `alias`, não `source`.
 
 ### Windows
 
@@ -77,9 +87,7 @@ pasta inteira e dê dois cliques em **`xiso-manager.exe`**. Roda no Windows 10/1
 (64 bits) sem instalar nada: a pasta já traz tudo.
 
 ```
-xiso-manager.exe          lançador (abre o programa)
-xiso_manager.py           o programa
-python\                   Python portátil oficial (python.org, "embeddable")
+xiso-manager.exe          o programa
 extract-xiso-pt.exe       extract-xiso-pt, em português
 iso2god.exe               iso2god em Rust, em português
 ```
@@ -96,14 +104,16 @@ Linux: espera o iso2god apagar a conversão incompleta antes de sair.
 > direito num espaço vazio da pasta, escolha **Abrir no Terminal** e digite
 > `.\xiso-manager.exe`.
 
-O lançador é um programa pequeno em Rust (`windows/lancador/`); para gerar o
-`.exe` a partir do Linux:
+Se o programa terminar com erro, a janela aberta com dois cliques espera o
+ENTER antes de fechar, para dar tempo de ler a mensagem.
+
+Para gerar o `.exe` a partir do Linux:
 
 ```bash
 sudo apt install clang lld llvm
 rustup target add x86_64-pc-windows-msvc
 cargo install --locked cargo-xwin
-cd windows/lancador && cargo xwin build --release --target x86_64-pc-windows-msvc
+cargo xwin build --release --target x86_64-pc-windows-msvc
 ```
 
 ### Qual iso2god
@@ -238,7 +248,7 @@ Tudo fica junto, na própria pasta da ferramenta:
 
 ```
 ~/Ferramentas/xiso-manager/
-├── xiso_manager.py           o programa
+├── xiso-manager              o programa
 ├── extract-xiso-pt           ISOs de Xbox e Xbox 360
 ├── config.json               idioma, caminhos, threads, pasta padrão
 ├── xiso-manager.log          log de todas as execuções
@@ -247,11 +257,11 @@ Tudo fica junto, na própria pasta da ferramenta:
 
 Os três últimos são criados sozinhos no primeiro uso.
 
-Como os caminhos são calculados a partir da localização do próprio script, você pode
+Como os caminhos são calculados a partir da localização do próprio programa, você pode
 mover ou copiar a pasta inteira para outra máquina, outro disco ou um pendrive, e ela
 continua funcionando sem reconfigurar nada.
 
-Se a pasta não for gravável (script instalado em `/usr/local/bin`, por exemplo), config
+Se a pasta não for gravável (programa instalado em `/usr/local/bin`, por exemplo), config
 e log caem em `~/.config/xiso-manager/` automaticamente.
 
 O log pode ser consultado direto no menu, opção **[l]** — erros em vermelho, avisos em âmbar.
@@ -271,10 +281,7 @@ O log pode ser consultado direto no menu, opção **[l]** — erros em vermelho,
 ## Problemas comuns
 
 **"Permissão negada" ao rodar**
-`chmod +x ~/Ferramentas/xiso-manager/xiso_manager.py`
-
-**"bad interpreter" ou nada acontece**
-`python3 ~/Ferramentas/xiso-manager/xiso_manager.py`
+`chmod +x ~/Ferramentas/xiso-manager/xiso-manager`
 
 **Binário aparece como ✗ não encontrado**
 Mova o executável para a pasta da ferramenta ou informe o caminho em
@@ -291,7 +298,7 @@ O programa respeita `NO_COLOR` e desliga sozinho quando a saída não é um term
 
 ## Requisitos
 
-Python 3.8+, `extract-xiso-pt` e `iso2god`. Nenhuma biblioteca externa.
+Linux x86_64 ou Windows 10/11 (64 bits), `extract-xiso-pt` e `iso2god`.
 
 ---
 
@@ -299,11 +306,15 @@ Python 3.8+, `extract-xiso-pt` e `iso2god`. Nenhuma biblioteca externa.
 
 - Testes automáticos das telas do menu, de cada operação e dos achados da
   auditoria (`tests/`), com ferramentas simuladas para cobrir falhas e
-  cancelamentos.
-- **Integração contínua** no GitHub Actions, no Linux e no Windows: menu em
-  Python 3.8 a 3.14, `xiso-manager.exe` e o pacote com o Python portátil.
+  cancelamentos. Eles conduzem o programa compilado pelo teclado e comparam
+  cada tela, byte a byte, com a da versão anterior.
+- Testes de unidade no próprio código (`cargo test`).
+- **Integração contínua** no GitHub Actions, no Linux e no Windows: o
+  programa, as telas e o pacote do Windows.
 
 ```bash
+cargo build --release
+cargo test
 python3 -m unittest discover -s tests
 ```
 

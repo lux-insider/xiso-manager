@@ -5,6 +5,7 @@ antiga. As versões seguem o [Versionamento Semântico](https://semver.org/lang/
 
 | Versão | Data | Destaque |
 |---|---|---|
+| [4.0.0](#400--2026-10-18) | 18/10/2026 | Reescrito em Rust: um executável só, sem Python |
 | [3.2.9](#329--2026-10-02) | 02/10/2026 | Assistente com o extract-xiso oficial e config.json estragado |
 | [3.2.8](#328--2026-10-02) | 02/10/2026 | Confirmação antes de sobrescrever e janela de erro no Windows |
 | [3.2.7](#327--2026-10-02) | 02/10/2026 | Acentos no Windows e testes no GitHub Actions |
@@ -18,6 +19,22 @@ antiga. As versões seguem o [Versionamento Semântico](https://semver.org/lang/
 | [3.1.1](#311--2026-09-29) | 29/09/2026 | Nome e ícone dos jogos de Xbox 360 |
 | [3.1](#31--2026-09-29) | 29/09/2026 | Versão para Windows e auditoria |
 | [3.0](#30--2026-09-24) | 24/09/2026 | Primeira versão pública |
+
+---
+
+## 4.0.0 — 2026-10-18
+
+### Alterado
+- **Reescrito em Rust.** O menu, as telas, as perguntas e as ações são os
+  mesmos, conferidos byte a byte com a 3.2.9 pelos testes das telas. A
+  diferença está na instalação: é um executável só, que abre na hora.
+- **Linux:** o `xiso-manager` vem pronto na página de Releases; não precisa
+  mais de Python.
+- **Windows:** o pacote ficou só com o `xiso-manager.exe` e as duas
+  ferramentas. Saíram o Python portátil e o lançador.
+
+### Removido
+- `xiso_manager.py` e o lançador do Windows (`windows/lancador`).
 
 ---
 

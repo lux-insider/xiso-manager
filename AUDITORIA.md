@@ -721,3 +721,32 @@ O que continua só descrito no xiso-manager: V-3 (Ctrl+C nas outras
 perguntas, Baixa), V-6 (`taskkill /F` no Windows, Baixa, sem uma correção
 que não piore outro caso) e D-1 a D-3 (tamanho do pacote e desempenho).
 Nenhum deles põe arquivo em risco.
+
+## Versão 4.0: o menu em Rust
+
+Na 4.0 o `xiso_manager.py` foi reescrito em Rust, sem mudar o que o usuário
+vê: um executável só, no Linux e no Windows, sem Python, sem o Python
+portátil e sem o lançador. Cada correção desta auditoria foi levada junto:
+
+- **Telas:** as 20 telas gravadas (`tests/test_telas.py`, inclusive os menus
+  em cores num pseudoterminal) continuam valendo byte a byte; só o número da
+  versão no título mudou. Os testes Python agora conduzem o executável
+  compilado (`target/release/xiso-manager`, ou o indicado em `XM_PROGRAMA`).
+- **Testes que liam o módulo Python por dentro** viraram testes de unidade
+  em Rust (`cargo test`): W-1 (`sinais.rs`), L-2, L-3, L-4 e L-6
+  (`executar.rs`, `eventos.rs`), E-2 e E-3 (`selecao.rs`), C-2
+  (`config.rs`), além da reescrita interrompida com um `.old` que já
+  existia. O C-1 passou a ser testado pelo menu de verdade: a gravação que
+  falha deixa o `config.json` como estava, e o link continua link.
+- **L-1** não se aplica mais: a leitura da saída não tem como receber um
+  tipo que a derrube; um campo de tipo errado vale como ausente.
+- **Sinais:** Ctrl+C, SIGTERM e SIGHUP são anotados pelo tratador e
+  conferidos pela pergunta em espera (a cada 40 ms) e pela leitura da
+  ferramenta. Um sinal que chega junto com uma linha digitada vem primeiro,
+  como no Python: o ENTER logo depois de um Ctrl+C em "Confirmar? [S/n]"
+  não confirma (E-1), e o fim da entrada logo depois de um SIGTERM não
+  impede a saída pelo sinal (P-1).
+- **LZ-1 e D-1** deixam de existir: não há Python portátil. **V-4** ficou no
+  próprio programa: com erro fatal e a janela aberta só para ele, espera o
+  ENTER. O teste do pacote usa um executável compilado com a feature
+  `teste-erro-fatal`, que o binário publicado não tem.

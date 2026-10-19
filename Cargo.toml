@@ -1,0 +1,37 @@
+[package]
+name = "xiso-manager"
+version = "4.0.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Gerenciador interativo, em português, para imagens ISO de Xbox e Xbox 360"
+license = "MIT"
+repository = "https://github.com/lux-insider/xiso-manager"
+publish = false
+
+[features]
+# Só para o teste do pacote do Windows: XM_ERRO_FATAL=1 provoca um erro
+# fatal na abertura (o binário publicado não tem isso).
+teste-erro-fatal = []
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+regex = "1"
+same-file = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Console",
+    "Win32_System_Threading",
+] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

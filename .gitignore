@@ -9,5 +9,5 @@ __pycache__/
 extract-xiso
 extract-xiso-pt*
 iso2god*
-/windows/lancador/target/
+/target/
 tests/__pycache__/
