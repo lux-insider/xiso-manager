@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from apoio import (WINDOWS, Ambiente, ConsoleProprio, carregar_modulo,  # noqa: E402
+from apoio import (WINDOWS, Ambiente, ConsoleProprio,  # noqa: E402
                    esperar_morrer, link_de_pasta, matar, matar_arvore, sem_cor, vivo)
 
 ORIGINAL = b"ISO ORIGINAL " * 1000
@@ -363,8 +363,8 @@ class P2TerminalFechado(Base):
         processo = subprocess.Popen(
             [sys.executable, "-c", "import signal, subprocess, sys; "
              "signal.signal(signal.SIGHUP, signal.SIG_IGN); "
-             "sys.exit(subprocess.call([sys.executable, sys.argv[1]]))",
-             str(self.amb.app / "xiso_manager.py")],
+             "sys.exit(subprocess.call([sys.argv[1]]))",
+             str(self.amb.programa)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             env=self.amb.env, start_new_session=True)
         time.sleep(0.8)
@@ -395,68 +395,6 @@ class P3CtrlCComOPipeCheio(Base):
         self.assertNotIn("sinal 9", self.amb.registro_texto())
 
 
-class W1JanelaFechadaNoWindows(Base):
-    """W-1: no Windows, fechar a janela matava o menu na hora, e a reescrita
-    do extract-xiso oficial ficava pela metade, com o original como .old. O
-    tratador do console (que só existe no Windows) chama esta função; aqui
-    ela é chamada direto, com a reescrita interrompida já no disco."""
-
-    def preparar(self, segundos):
-        xm = carregar_modulo(self.amb)
-        # a função cala a saída (a janela já não existe): devolve a do teste
-        self.addCleanup(setattr, sys, "stdout", sys.stdout)
-        self.addCleanup(setattr, sys, "stderr", sys.stderr)
-        saida = sys.stdout
-        self.addCleanup(lambda: sys.stdout is not saida and sys.stdout.close())
-        origem = str(self.iso)
-        antigo = origem + ".old"
-        marca = xm._marcar_original(origem, antigo, origem)
-        os.rename(origem, antigo)
-        self.iso.write_bytes(b"pela metade")
-        xm._pendentes.append(marca)
-        xm._ferramenta = __import__("subprocess").Popen(
-            [sys.executable, "-c", "import time; time.sleep(%s)" % segundos])
-        self.addCleanup(lambda: matar(xm._ferramenta.pid))
-        return xm
-
-    def test_espera_a_ferramenta_e_desfaz(self):
-        xm = self.preparar(0.5)
-        self.assertTrue(xm._ao_fechar_console(2))           # CTRL_CLOSE_EVENT
-        self.assertIsNotNone(xm._ferramenta.poll(), "esperou a ferramenta sair")
-        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
-        self.assertIsNotNone(xm._encerrar)
-        self.assertIn("Sessão encerrada", (self.amb.app / "xiso-manager.log").read_text(encoding="utf-8"))
-
-    def test_ferramenta_que_nao_sai_tem_prazo(self):
-        xm = self.preparar(30)
-        xm.PRAZO_JANELA = 0.3
-        inicio = time.time()
-        self.assertTrue(xm._ao_fechar_console(6))           # CTRL_SHUTDOWN_EVENT
-        self.assertLess(time.time() - inicio, 3)
-        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
-
-    def test_ctrl_c_segue_para_o_python(self):
-        xm = self.preparar(0)
-        for evento in (0, 1):                               # CTRL_C, CTRL_BREAK
-            self.assertFalse(xm._ao_fechar_console(evento))
-        self.assertIsNone(xm._encerrar)
-        self.assertEqual(len(xm._pendentes), 1)
-
-    @unittest.skipUnless(WINDOWS, "o tratador de console só existe no Windows")
-    def test_tratador_registrado_no_console(self):
-        """O tratador de verdade: registrado com SetConsoleCtrlHandler e
-        chamado pelo caminho do Windows (a função C que o ctypes monta)."""
-        import ctypes
-        xm = self.preparar(0.5)
-        xm._instalar_tratador_console()
-        self.assertIsNotNone(xm._tratador_console)
-        self.assertEqual(xm._tratador_console(0), 0, "Ctrl+C segue para o Python")
-        self.assertEqual(xm._tratador_console(2), 1, "janela fechada: tratado")
-        self.assertEqual(self.arquivos(self.jogos), {"Halo.iso": "ORIGINAL"})
-        # tirar o tratador só dá certo se ele estava registrado
-        self.assertTrue(ctypes.windll.kernel32.SetConsoleCtrlHandler(xm._tratador_console, False))
-
-
 @unittest.skipUnless(WINDOWS, "fecha uma janela de console do Windows")
 class W1JanelaFechadaDeVerdade(Base):
     """W-1 de ponta a ponta: o menu num console próprio, no meio de uma
@@ -470,7 +408,7 @@ class W1JanelaFechadaDeVerdade(Base):
         registro = self.amb.dir / "tela.txt"
         tela = open(registro, "wb")
         self.addCleanup(tela.close)
-        console = ConsoleProprio([sys.executable, str(self.amb.app / "xiso_manager.py")],
+        console = ConsoleProprio([str(self.amb.programa)],
                                  dict(self.amb.env, **LENTO), tela)
         self.addCleanup(lambda: matar_arvore(console))
         console.digitar(["6", "c", str(self.iso), "", "", "", "", "", "", "0"])
@@ -542,26 +480,6 @@ class L1EventoComTipoErrado(Base):
         self.assertNotIn("inesperado", saida)
         self.assertIn("SHA1", saida)
 
-    @unittest.skipIf(WINDOWS, "no Windows não há SIGTERM para a ferramenta limpar: o menu a encerra")
-    def test_se_a_leitura_falhar_a_ferramenta_nao_fica_rodando(self):
-        xm = carregar_modulo(self.amb)
-        def quebra(_evento):
-            raise RuntimeError("defeito na leitura")
-        xm._texto_evento = quebra
-        variaveis = dict(LENTO, XMF_PIDS=str(self.amb.pids), XMF_REGISTRO=str(self.amb.registro))
-        os.environ.update(variaveis)
-        self.addCleanup(lambda: [os.environ.pop(k, None) for k in variaveis])
-        import contextlib
-        import io
-        with contextlib.redirect_stdout(io.StringIO()):
-            r = xm.executar([str(self.amb.ferramenta("iso2god")), "converter", "--progresso-json",
-                             str(self.iso), str(self.amb.dir / "GOD")], "t")
-        filho = self.amb.esperar_ferramenta()[0]
-        self.addCleanup(matar, filho)
-        self.assertIn("defeito na leitura", r.erro)
-        self.assertFalse(vivo(filho), "a ferramenta tem que ser parada e esperada")
-        self.assertIn("limpou", self.amb.registro_texto())
-
 
 @unittest.skipIf(WINDOWS, "a memória é medida com o módulo resource, que só existe no Unix")
 class L2LinhaEnorme(Base):
@@ -571,14 +489,14 @@ class L2LinhaEnorme(Base):
     def test_rapido_e_com_memoria_limitada(self):
         import subprocess
         medidor = ("import resource, subprocess, sys; "
-                   "p = subprocess.run([sys.executable, sys.argv[1]], input=sys.argv[2].encode(), "
+                   "p = subprocess.run([sys.argv[1]], input=sys.argv[2].encode(), "
                    "stdout=subprocess.PIPE, stderr=subprocess.DEVNULL); "
                    "sys.stdout.buffer.write(p.stdout); "
                    "print('\\nPICO=%d' % resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss)")
         env = dict(self.amb.env, XMF_SAIDA="linha_enorme", XMF_MIB="32", XMF_PASSOS="0")
         inicio = time.time()
         processo = subprocess.Popen(
-            [sys.executable, "-c", medidor, str(self.amb.app / "xiso_manager.py"),
+            [sys.executable, "-c", medidor, str(self.amb.programa),
              "4\nc\n%s\n\n0\n" % self.iso], env=env, stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL, start_new_session=True)
         try:
@@ -593,57 +511,6 @@ class L2LinhaEnorme(Base):
         self.assertIn("fim da linha enorme", saida)
         self.assertLess(duracao, 30, "levou %.0f s" % duracao)
         self.assertLess(pico_mib, 120, "pico de %d MiB" % pico_mib)
-
-
-def executar_aqui(teste, cmd, env=None, **kw):
-    """Roda `executar` do menu neste processo (sem tela) e devolve o
-    Resultado e o que ele imprimiu."""
-    import contextlib
-    import io
-    xm = carregar_modulo(teste.amb)
-    variaveis = dict(env or {}, XMF_PIDS=str(teste.amb.pids), XMF_REGISTRO=str(teste.amb.registro))
-    antes = {k: os.environ.get(k) for k in variaveis}
-    os.environ.update(variaveis)
-    try:
-        tela = io.StringIO()
-        with contextlib.redirect_stdout(tela):
-            r = xm.executar(cmd, "Teste", **kw)
-    finally:
-        for k, v in antes.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
-    return r, sem_cor(tela.getvalue())
-
-
-class L3AcentoPartido(Base):
-    """L-3: um "ç" (2 bytes) na divisa de duas leituras de 4 KiB. Antes, cada
-    pedaço era decodificado sozinho e o caractere virava "��"."""
-
-    def test_acento_inteiro(self):
-        r, _ = executar_aqui(self, [str(self.amb.ferramenta("extract-xiso-pt")), "listar", "x.iso"],
-                             {"XMF_SAIDA": "utf8_partido", "XMF_PASSOS": "0"})
-        linhas = [l for l in r.saida if l.endswith("fim")]
-        self.assertEqual(linhas, ["a" * 4095 + "çé fim"])
-
-
-class L4MensagemDoVerificarUmaVezSo(Base):
-    """L-4: o verificar --progresso-json manda o erro como evento JSON e como
-    texto ("❌ ..."); o menu mostrava os dois."""
-
-    MENSAGEM = "a imagem está truncada: termina no setor 1000, o volume declara 2000"
-
-    def verificar(self, env):
-        r, _ = executar_aqui(self, [str(self.amb.ferramenta("extract-xiso-pt")), "verificar",
-                                    str(self.iso), "--progresso-json"], dict(env, XMF_FALHAR="1"))
-        return [l for l in r.saida if self.MENSAGEM in l]
-
-    def test_evento_e_depois_texto(self):
-        self.assertEqual(self.verificar({}), ["erro: " + self.MENSAGEM])
-
-    def test_texto_e_depois_evento(self):
-        self.assertEqual(self.verificar({"XMF_ERRO_TEXTO_ANTES": "1"}), ["X " + self.MENSAGEM])
 
 
 class L5InfoJsonInesperado(Base):
@@ -689,14 +556,6 @@ class L6TextoDaIsoCruNoTerminal(Base):
             self.assertNotIn(p, linha)
         self.assertIn("Jogo", linha)
         self.assertIn("fim", linha)
-
-    def test_linha_de_saida(self):
-        r, _ = executar_aqui(self, [str(self.amb.ferramenta("extract-xiso-pt")), "listar", "x.iso"],
-                             {"XMF_SAIDA": "controle", "XMF_PASSOS": "0"})
-        linha = [l for l in r.saida if "título" in l][0]
-        for p in PERIGOSOS:
-            self.assertNotIn(p, linha)
-        self.assertIn("etxet", linha)
 
 
 # ── 4. Configuração e entrada ───────────────────────────────────────────────
@@ -782,27 +641,21 @@ class C1ConfigRegravadoNoLugar(Base):
     da gravação (queda de energia, SIGKILL) o deixava pela metade, e as
     configurações voltavam ao padrão."""
 
-    def salvar_e_morrer_no_meio(self):
-        """Um menu que muda o idioma e morre no meio da gravação."""
-        codigo = (
-            "import importlib.util, json, os, sys\n"
-            "spec = importlib.util.spec_from_file_location('xm', sys.argv[1])\n"
-            "xm = importlib.util.module_from_spec(spec); spec.loader.exec_module(xm)\n"
-            "xm.carregar_config()\n"
-            "def dump(dados, f, **kw):\n"
-            "    f.write(json.dumps(dados, **kw)[:20]); f.flush(); os._exit(9)\n"
-            "xm.json.dump = dump\n"
-            "xm.set_cfg('idioma', 'en')\n")
-        r = __import__("subprocess").run(
-            [sys.executable, "-c", codigo, str(self.amb.app / "xiso_manager.py")],
-            env=self.amb.env, capture_output=True, timeout=60)
-        self.assertEqual(r.returncode, 9, r.stderr)
+    def mudar_threads(self, valor):
+        """Muda as threads do iso2god pelo menu de configurações."""
+        codigo, saida, erros = self.amb.rodar(["c", "5", str(valor), "0", "0"])
+        self.assertEqual(codigo, 0, erros)
 
-    def test_morrer_no_meio_mantem_o_config(self):
+    def test_gravacao_que_falha_mantem_o_config(self):
+        """O arquivo novo é gravado ao lado e só então troca de nome: se a
+        gravação falhar, o config.json fica como estava."""
         self.amb.config(idioma="pt", threads_god=7)
         antes = (self.amb.app / "config.json").read_text(encoding="utf-8")
-        self.salvar_e_morrer_no_meio()
+        (self.amb.app / "config.json.tmp").mkdir()      # o temporário não pode ser criado
+        self.mudar_threads(9)
         self.assertEqual((self.amb.app / "config.json").read_text(encoding="utf-8"), antes)
+        self.assertIn("Falha ao salvar config",
+                      (self.amb.app / "xiso-manager.log").read_text(encoding="utf-8"))
 
     def test_formato_e_link_continuam(self):
         guardado = self.amb.dir / "guardado.json"
@@ -811,13 +664,15 @@ class C1ConfigRegravadoNoLugar(Base):
             (self.amb.app / "config.json").symlink_to(guardado)
         except OSError as e:                # Windows sem permissão para criar link
             self.skipTest("não deu para criar o link: %s" % e)
-        xm = carregar_modulo(self.amb)
-        xm.set_cfg("threads_god", 9)
+        self.mudar_threads(9)
         self.assertTrue((self.amb.app / "config.json").is_symlink())
+        import json
+        dados = json.loads(guardado.read_text(encoding="utf-8"))
+        self.assertEqual(dados["threads_god"], 9)
         self.assertEqual(guardado.read_text(encoding="utf-8"),
-                         __import__("json").dumps(xm._config, indent=2, ensure_ascii=False))
-        self.assertEqual(sorted(p.name for p in self.amb.app.iterdir() if p.name != "__pycache__"),
-                         ["config.json", "xiso-manager.log", "xiso_manager.py"])
+                         json.dumps(dados, indent=2, ensure_ascii=False))
+        self.assertEqual(sorted(p.name for p in self.amb.app.iterdir()),
+                         sorted(["config.json", "xiso-manager.log", self.amb.programa.name]))
 
 
 class C2NuloNoConfig(Base):
@@ -830,12 +685,6 @@ class C2NuloNoConfig(Base):
         self.assertEqual(codigo, 0, erros)
         self.assertNotIn("Erro inesperado", saida)
         self.assertNotIn("null", saida)
-
-    def test_caminhos_com_nulo_voltam_ao_padrao(self):
-        xm = carregar_modulo(self.amb)
-        for chave in ("bin_extract_xiso", "bin_iso2god", "pasta_padrao"):
-            self.assertEqual(xm._validar_config(chave, "a\x00b"), xm.CONFIG_PADRAO[chave])
-            self.assertEqual(xm._validar_config(chave, "/a/b"), "/a/b")
 
 
 @CTRL_C_NO_GRUPO
@@ -857,45 +706,10 @@ class E1CtrlCNaConfirmacao(Base):
         self.assertIn("Operação cancelada pelo usuário.", saida)
 
 
-class E2IntervaloEnorme(Base):
-    """E-2: cada número de um intervalo virava um item; "1-3000000" gerava 3
-    milhões de textos de "inválido" e "1-999999999" esgotava a memória."""
-
-    def setUp(self):
-        super().setUp()
-        self.xm = carregar_modulo(self.amb)
-
-    def test_intervalo_grande(self):
-        inicio = time.time()
-        resultado = self.xm._expandir_selecao("0-3000000, 1", 3)
-        self.assertLess(time.time() - inicio, 0.5)
-        self.assertEqual(resultado, ([0, 1, 2], ["0", "4-3000000"]))
-        self.assertEqual(self.xm._expandir_selecao("999999999-2", 3),
-                         ([1, 2], ["4-999999999"]))
-
-    def test_intervalo_pequeno_igual_a_antes(self):
-        self.assertEqual(self.xm._expandir_selecao("0-5,3-1,9,x", 3),
-                         ([0, 1, 2], ["0", "4", "5", "9", "x"]))
-        _, invalidos = self.xm._expandir_selecao("1-1000", 3)
-        self.assertEqual(invalidos, [str(n) for n in range(4, 1001)])
-
-
 class E3DigitosQueNaoSaoDeZeroANove(Base):
     """E-3: "²".isdigit() é verdadeiro, mas int("²") falha: a escolha virava
     "Erro inesperado". O mesmo com um número de milhares de algarismos, que
     o int recusa."""
-
-    def test_selecao(self):
-        xm = carregar_modulo(self.amb)
-        enorme = "1" * 5000
-        try:
-            int(enorme)                     # antes do 3.11 o int não tinha limite
-            esperado = ([1, 2, 0], ["²", "1-²", enorme, "4-" + enorme])
-        except ValueError:
-            esperado = ([0], ["²", "1-²", enorme, "2-" + enorme])
-        self.assertEqual(xm._expandir_selecao("², 1-², %s, 2-%s, 1" % (enorme, enorme), 3),
-                         esperado)
-        self.assertEqual(xm._expandir_selecao("٣", 3), ([2], []))
 
     def test_menus_de_escolha(self):
         self.amb.config(pasta_padrao=str(self.jogos))
@@ -907,11 +721,11 @@ class E3DigitosQueNaoSaoDeZeroANove(Base):
             self.assertNotIn("Erro inesperado", saida, entradas)
 
 
-# ── Codificação: o Python fora do modo UTF-8 ────────────────────────────────
+# ── Codificação: o sistema fora do UTF-8 ────────────────────────────────────
 
-# A codificação padrão deixa de ser UTF-8: num Linux com LANG=C, ASCII; no
-# Windows, sem o modo UTF-8 que o lançador do pacote liga, cp1252. É o caso
-# de quem roda o xiso_manager.py direto no Windows.
+# A codificação padrão do sistema deixa de ser UTF-8 (num Linux com LANG=C,
+# ASCII). O título do info e o log continuam em UTF-8. (PYTHONUTF8 vale para
+# as ferramentas falsas, que são Python.)
 SEM_UTF8 = {"LANG": "C", "LC_ALL": "C", "PYTHONUTF8": "0"}
 
 

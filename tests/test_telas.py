@@ -179,7 +179,7 @@ def rodar_no_terminal(amb, entradas, colunas=100, linhas=40):
     termios.tcsetattr(escravo, termios.TCSANOW, atributos)
     env = dict(amb.env, TERM="xterm-256color", COLUMNS=str(colunas), LINES=str(linhas))
     env.pop("NO_COLOR", None)
-    processo = subprocess.Popen([sys.executable, str(amb.app / "xiso_manager.py")],
+    processo = subprocess.Popen([str(amb.programa)],
                                 stdin=escravo, stdout=escravo, stderr=escravo, env=env,
                                 cwd=str(BASE / "trabalho"), start_new_session=True)
     os.close(escravo)

@@ -1,4 +1,4 @@
-"""Apoio dos testes: uma pasta temporária com uma cópia do xiso_manager.py,
+"""Apoio dos testes: uma pasta temporária com uma cópia do xiso-manager,
 um config.json apontando para as ferramentas falsas (tests/falsos) e funções
 para conduzir o menu de verdade pela entrada padrão, mandar sinais e
 conferir o que sobrou no disco.
@@ -6,9 +6,7 @@ conferir o que sobrou no disco.
 Nada aqui usa rede nem ISO de verdade.
 """
 
-import importlib.util
 import json
-import logging
 import os
 import shutil
 import signal
@@ -20,9 +18,11 @@ import time
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-PROGRAMA = RAIZ / "xiso_manager.py"
-FALSO = RAIZ / "tests" / "falsos" / "ferramenta_falsa.py"
 WINDOWS = os.name == "nt"
+NOME_PROGRAMA = "xiso-manager.exe" if WINDOWS else "xiso-manager"
+# o executável testado: o da compilação de release, ou o indicado
+PROGRAMA = Path(os.environ.get("XM_PROGRAMA") or RAIZ / "target" / "release" / NOME_PROGRAMA)
+FALSO = RAIZ / "tests" / "falsos" / "ferramenta_falsa.py"
 
 
 def _executavel(caminho):
@@ -45,7 +45,8 @@ class Ambiente:
         self.bin = self.dir / "bin"
         self.app.mkdir()
         self.bin.mkdir()
-        shutil.copy(PROGRAMA, self.app / "xiso_manager.py")
+        self.programa = self.app / NOME_PROGRAMA
+        shutil.copy(PROGRAMA, self.programa)
         _executavel(FALSO)
         for nome in ("extract-xiso-pt", "extract-xiso", "iso2god"):
             if WINDOWS:
@@ -100,7 +101,7 @@ class Ambiente:
         ferramenta, como o Ctrl+C."""
         ambiente = dict(self.env, **(env or {}))
         processo = subprocess.Popen(
-            [sys.executable, str(self.app / "xiso_manager.py"), *argumentos],
+            [str(self.programa), *argumentos],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             env=ambiente, start_new_session=True, cwd=cwd)
         processo.stdin.write("".join(e + "\n" for e in entradas).encode("utf-8"))
@@ -124,7 +125,7 @@ class Ambiente:
             fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 
         processo = subprocess.Popen(
-            [sys.executable, str(self.app / "xiso_manager.py")],
+            [str(self.programa)],
             stdin=escravo, stdout=escravo, stderr=escravo,
             env=dict(self.env, **(env or {})), preexec_fn=controlar)
         os.close(escravo)
@@ -370,19 +371,6 @@ def matar_arvore(processo):
             os.killpg(processo.pid, signal.SIGKILL)
         except OSError:
             pass
-
-
-def carregar_modulo(ambiente):
-    """Importa a cópia do menu de um ambiente, neste processo (para testar
-    funções soltas). A pasta da cópia vira a pasta do config e do log."""
-    for h in list(logging.root.handlers):
-        logging.root.removeHandler(h)
-        h.close()
-    spec = importlib.util.spec_from_file_location("xiso_manager_teste", ambiente.app / "xiso_manager.py")
-    modulo = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(modulo)
-    modulo.carregar_config()
-    return modulo
 
 
 def sem_cor(texto):
