@@ -1,6 +1,6 @@
 [package]
 name = "xiso-manager"
-version = "4.0.1"
+version = "4.1.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Gerenciador interativo, em português, para imagens ISO de Xbox e Xbox 360"
@@ -47,6 +47,7 @@ rfd = { version = "0.17", optional = true, default-features = false, features = 
 png = { version = "0.18", optional = true }
 
 [build-dependencies]
+embed-resource = "3.0"
 slint-build = { version = "1.18", optional = true }
 
 [target.'cfg(unix)'.dependencies]

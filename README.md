@@ -6,21 +6,22 @@
 ![Plataformas](https://img.shields.io/badge/plataformas-Windows%20%7C%20Linux-informational)
 ![Rust](https://img.shields.io/badge/Rust-2024-orange)
 
-Gerenciador interativo, em português, para imagens ISO de **Xbox** e
-**Xbox 360**. Reúne num menu só o
+Gerenciador, em português, para imagens ISO de **Xbox** e **Xbox 360**, com
+**janela** e **menu no terminal**. Reúne num lugar só o
 [extract-xiso-pt](https://github.com/lux-insider/extract-xiso-pt) (extrair,
 listar, criar, reescrever e verificar) e o
 [iso2god-pt](https://github.com/lux-insider/iso2god-pt) (conversão para GOD).
-Detecta o console de cada ISO e só oferece as ações que fazem sentido. É um
-programa só, em Rust: não precisa instalar nada.
+Detecta o console de cada ISO e só oferece as ações que fazem sentido. Feito
+em Rust: não precisa instalar nada.
 
-![Menu do xiso-manager no terminal](docs/menu.png)
+![A janela do xiso-manager](docs/janela.png)
 
 ---
 
 ## Sumário
 
 - [Instalação](#instalação)
+- [Janela](#janela)
 - [Menu e opções](#o-que-cada-opção-faz)
 - [Onde os arquivos são salvos](#onde-os-arquivos-são-salvos)
 - [Detecção do tipo de ISO](#detecção-do-tipo-de-iso)
@@ -37,15 +38,15 @@ programa só, em Rust: não precisa instalar nada.
 
 ## Instalação
 
-A ferramenta é autocontida: tudo mora numa pasta só. Baixe o `xiso-manager`
-para Linux x86_64 da página de
-[Releases](https://github.com/lux-insider/xiso-manager/releases) e deixe numa
-pasta só dele:
+A ferramenta é autocontida: tudo mora numa pasta só. Baixe da página de
+[Releases](https://github.com/lux-insider/xiso-manager/releases), para Linux
+x86_64, o `xiso-manager` (menu no terminal) e o `xiso-manager-gui` (a janela),
+e deixe numa pasta só deles:
 
 ```bash
 mkdir -p ~/Ferramentas/xiso-manager
-mv ~/Downloads/xiso-manager ~/Ferramentas/xiso-manager/
-chmod +x ~/Ferramentas/xiso-manager/xiso-manager
+mv ~/Downloads/xiso-manager ~/Downloads/xiso-manager-gui ~/Ferramentas/xiso-manager/
+chmod +x ~/Ferramentas/xiso-manager/xiso-manager*
 ```
 
 Ou compile a partir do código (Rust 1.88 ou mais novo):
@@ -54,6 +55,9 @@ Ou compile a partir do código (Rust 1.88 ou mais novo):
 git clone https://github.com/lux-insider/xiso-manager.git
 cd xiso-manager && cargo build --release
 cp target/release/xiso-manager ~/Ferramentas/xiso-manager/
+# a janela (no Linux, precisa de: sudo apt install libfontconfig1-dev libxkbcommon-dev)
+cargo build --release --features gui
+cp target/release/xiso-manager-gui ~/Ferramentas/xiso-manager/
 ```
 
 Ele usa duas ferramentas externas. As duas, para Linux x86_64 (glibc 2.34+),
@@ -83,11 +87,13 @@ Depois `source ~/.bashrc` uma vez. Daí em diante é só `xiso`.
 
 Baixe o `xiso-manager-<versão>-windows-x64.zip` da página de
 [Releases](https://github.com/lux-insider/xiso-manager/releases), descompacte a
-pasta inteira e dê dois cliques em **`xiso-manager.exe`**. Roda no Windows 10/11
-(64 bits) sem instalar nada: a pasta já traz tudo.
+pasta inteira e dê dois cliques em **`xiso-manager-gui.exe`** (a janela) ou
+em **`xiso-manager.exe`** (o menu no terminal). Roda no Windows 10/11 (64 bits)
+sem instalar nada: a pasta já traz tudo.
 
 ```
-xiso-manager.exe          o programa
+xiso-manager-gui.exe      a janela
+xiso-manager.exe          o menu no terminal
 extract-xiso-pt.exe       extract-xiso-pt, em português
 iso2god.exe               iso2god em Rust, em português
 ```
@@ -113,7 +119,7 @@ Para gerar o `.exe` a partir do Linux:
 sudo apt install clang lld llvm
 rustup target add x86_64-pc-windows-msvc
 cargo install --locked cargo-xwin
-cargo xwin build --release --target x86_64-pc-windows-msvc
+cargo xwin build --release --target x86_64-pc-windows-msvc --features gui
 ```
 
 ### Qual iso2god
@@ -140,6 +146,42 @@ Na primeira execução ele procura `extract-xiso-pt` (ou, na falta dele, o `extr
 
 Achando, salva o caminho e não pergunta mais. Não achando, pede o caminho na hora.
 Se o binário existir mas não for executável, ele tenta o `chmod +x` sozinho.
+
+---
+
+## Janela
+
+O `xiso-manager-gui` faz o mesmo que o menu, com o mouse:
+
+- **Biblioteca:** arraste ISOs (ou uma pasta com ISOs) para a janela, ou use
+  **Adicionar**. Cada jogo aparece com o nome, o ícone, o Title ID e o tipo de
+  disco, lidos da própria ISO. O que já foi lido fica guardado e aparece na
+  hora da próxima vez.
+- **Converter para GOD, Extrair, Criar ISO, Reescrever e Verificar:** escolha
+  o jogo na Biblioteca, ajuste as opções e clique no botão. O painel de baixo
+  mostra a barra, a velocidade e o tempo que falta.
+- **Cancelar** para a ferramenta, que apaga o que já tinha gravado. Fechar a
+  janela no meio de uma tarefa faz o mesmo.
+- **Fila:** com uma tarefa rodando, o botão vira **Pôr na fila**. A caixa
+  **Fazer com todos os jogos da Biblioteca** enfileira um pedido por jogo.
+- **Selo do Redump:** depois de Verificar, o cartão do jogo mostra
+  **✓ Redump**, **Íntegra** ou **Não confere**.
+- **Configurações:** as ferramentas (com a versão encontrada), a pasta padrão,
+  as threads e o desenho da janela. As três primeiras são as mesmas do menu.
+
+A janela é leve: desenhada pelo processador, usa cerca de 30 MB de memória e
+fica parada quando nada muda. O trabalho pesado roda nas ferramentas, em
+processos separados, então a janela nunca trava. Em **Configurações** dá para
+desenhar pela placa de vídeo (OpenGL), que gasta mais memória (o driver de
+vídeo).
+
+No Linux, roda no X11 e no Wayland (arrastar arquivos para a janela, só no
+X11). Precisa da glibc 2.35 ou mais nova (Ubuntu 22.04, Debian 12, Fedora 36 em
+diante).
+
+O menu no terminal continua igual:
+
+![Menu do xiso-manager no terminal](docs/menu.png)
 
 ---
 
@@ -248,14 +290,18 @@ Tudo fica junto, na própria pasta da ferramenta:
 
 ```
 ~/Ferramentas/xiso-manager/
-├── xiso-manager              o programa
+├── xiso-manager              o menu no terminal
+├── xiso-manager-gui          a janela
 ├── extract-xiso-pt           ISOs de Xbox e Xbox 360
+├── iso2god                   conversão para GOD
 ├── config.json               idioma, caminhos, threads, pasta padrão
+├── janela.json               biblioteca e opções da janela
+├── janela-cache.json         nome, ícone e selo de cada jogo já lido
 ├── xiso-manager.log          log de todas as execuções
 └── xiso-manager.log.old      log anterior (rotaciona a cada 1 MiB)
 ```
 
-Os três últimos são criados sozinhos no primeiro uso.
+Os arquivos `.json` e o log são criados sozinhos no primeiro uso.
 
 Como os caminhos são calculados a partir da localização do próprio programa, você pode
 mover ou copiar a pasta inteira para outra máquina, outro disco ou um pendrive, e ela
@@ -298,7 +344,8 @@ O programa respeita `NO_COLOR` e desliga sozinho quando a saída não é um term
 
 ## Requisitos
 
-Linux x86_64 ou Windows 10/11 (64 bits), `extract-xiso-pt` e `iso2god`.
+Linux x86_64 ou Windows 10/11 (64 bits), `extract-xiso-pt` e `iso2god`. A
+janela pede o extract-xiso-pt 0.2.4 e o iso2god-pt 0.1.6 ou mais novos.
 
 ---
 

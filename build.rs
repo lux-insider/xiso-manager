@@ -1,4 +1,13 @@
 fn main() {
+    // Ícone dos executáveis no Windows (os dois: o menu e a janela).
+    println!("cargo:rerun-if-changed=gui/xiso-manager.rc");
+    println!("cargo:rerun-if-changed=gui/imagens/xiso-manager.ico");
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        embed_resource::compile("gui/xiso-manager.rc", embed_resource::NONE)
+            .manifest_optional()
+            .expect("ícone do Windows");
+    }
+
     // A janela só é compilada com a feature `gui`; o menu do terminal não
     // precisa do Slint.
     #[cfg(feature = "gui")]
