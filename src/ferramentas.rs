@@ -177,6 +177,25 @@ pub fn eh_pt() -> bool {
         .contains("extract-xiso-pt")
 }
 
+/// Ligado pela janela (xiso-manager-gui): no Windows, as ferramentas rodam
+/// sem console visível. Um programa de janela que chama um de console faz
+/// abrir uma janela preta a cada chamada; com a biblioteca lendo dezenas de
+/// jogos, seriam dezenas de janelas piscando.
+pub static SEM_CONSOLE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Prepara o comando de uma ferramenta (ver [`SEM_CONSOLE`]).
+pub fn novo_comando(programa: &std::ffi::OsStr) -> Command {
+    #[allow(unused_mut)]
+    let mut comando = Command::new(programa);
+    #[cfg(windows)]
+    if SEM_CONSOLE.load(std::sync::atomic::Ordering::Relaxed) {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW: o console existe, mas não aparece
+        comando.creation_flags(0x0800_0000);
+    }
+    comando
+}
+
 pub enum Falha {
     Abrir(std::io::Error),
     Prazo,
@@ -187,7 +206,7 @@ pub fn capturar(
     cmd: &[OsString],
     prazo: Duration,
 ) -> Result<(ExitStatus, Vec<u8>, Vec<u8>), Falha> {
-    let mut filho = Command::new(&cmd[0])
+    let mut filho = novo_comando(&cmd[0])
         .args(&cmd[1..])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

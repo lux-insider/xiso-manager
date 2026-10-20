@@ -14,7 +14,7 @@ publish = false
 teste-erro-fatal = []
 # A janela (xiso-manager-gui). Fora dela, o menu do terminal compila sem o
 # Slint e continua leve.
-gui = ["dep:slint", "dep:slint-build"]
+gui = ["dep:slint", "dep:slint-build", "dep:rfd", "dep:png"]
 
 [[bin]]
 name = "xiso-manager"
@@ -40,6 +40,11 @@ slint = { version = "1.18", optional = true, default-features = false, features 
     "renderer-software",
     "unstable-winit-030",
 ] }
+
+# Seletor de arquivos nativo (no Linux, o portal do sistema; sem GTK).
+rfd = { version = "0.17", optional = true, default-features = false, features = ["xdg-portal"] }
+# Ícone dos jogos (PNG dentro do default.xex), lido pelo iso2god.
+png = { version = "0.18", optional = true }
 
 [build-dependencies]
 slint-build = { version = "1.18", optional = true }

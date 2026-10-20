@@ -11,7 +11,7 @@ use std::collections::{HashSet, VecDeque};
 use std::ffi::OsString;
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::{Child, Command, ExitStatus, Stdio};
+use std::process::{Child, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -594,7 +594,7 @@ fn abrir(cmd: &[OsString]) -> std::io::Result<(Child, std::io::PipeReader)> {
     let (leitor, escritor) = std::io::pipe()?;
     let escritor_erro = escritor.try_clone()?;
     let pela_entrada = crate::ferramentas::cancela_pela_entrada(cmd);
-    let mut comando = Command::new(&cmd[0]);
+    let mut comando = crate::ferramentas::novo_comando(&cmd[0]);
     comando
         .args(&cmd[1..])
         .stdin(if pela_entrada {

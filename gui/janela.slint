@@ -2,7 +2,10 @@
 //
 // Desempenho: nada se move sem motivo. Sem animações contínuas e sem
 // desfoque; o painel translúcido é só cor com transparência. O disco é um
-// SVG desenhado uma vez e guardado pelo Slint.
+// SVG desenhado uma vez e guardado pelo Slint. A lista de jogos só cria os
+// cartões que aparecem na tela.
+
+import { ListView } from "std-widgets.slint";
 
 export global Tema {
     out property <color> fundo: #14171c;
@@ -14,6 +17,118 @@ export global Tema {
     out property <color> texto: #e6edf3;
     out property <color> texto-fraco: #8b949e;
     out property <length> raio: 10px;
+    out property <color> aviso: #f0b429;
+}
+
+export struct Jogo {
+    caminho: string,
+    nome: string,
+    detalhe: string,
+    aviso: string,
+    icone: image,
+    tem-icone: bool,
+    lendo: bool,
+}
+
+component Cartao inherits Rectangle {
+    in property <Jogo> jogo;
+    in property <bool> selecionado;
+    callback clicado;
+    callback remover;
+
+    height: 84px;
+    border-radius: Tema.raio;
+    // Durante a leitura o fundo é um tom invisivelmente diferente: quando
+    // ela termina, o cartão inteiro é redesenhado. Sem isso, no desenho por
+    // software sobrava um pedaço do nome antigo (a perna do "j" de
+    // "jogo.iso" sai um pouco para fora da área do texto).
+    background: root.selecionado ? Tema.realce-fundo : toque.has-hover ? #ffffff12 : root.jogo.lendo ? #ffffff0c : Tema.painel;
+    border-width: 1px;
+    border-color: root.selecionado ? Tema.realce : Tema.painel-borda;
+
+    toque := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicado();
+        }
+    }
+
+    HorizontalLayout {
+        padding: 12px;
+        spacing: 14px;
+
+        Rectangle {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            background: #0b0d10;
+            clip: true;
+
+            if root.jogo.tem-icone: Image {
+                source: root.jogo.icone;
+                width: parent.width;
+                height: parent.height;
+                image-fit: cover;
+            }
+            if !root.jogo.tem-icone: Image {
+                source: @image-url("imagens/icone.svg");
+                width: 40px;
+                height: 40px;
+                opacity: root.jogo.lendo ? 0.25 : 0.6;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 4px;
+            Text {
+                text: root.jogo.nome;
+                color: Tema.texto;
+                font-size: 15px;
+                font-weight: 600;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.jogo.lendo ? "Lendo…" : root.jogo.detalhe;
+                color: Tema.texto-fraco;
+                font-size: 12px;
+                overflow: elide;
+            }
+
+            if root.jogo.aviso != "": Text {
+                text: root.jogo.aviso;
+                color: Tema.aviso;
+                font-size: 12px;
+                overflow: elide;
+            }
+        }
+
+        // remover da biblioteca (o arquivo não é apagado)
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 32px;
+                height: 32px;
+                border-radius: 6px;
+                background: fechar.has-hover ? #ffffff1a : transparent;
+                visible: toque.has-hover || fechar.has-hover;
+                Image {
+                    source: @image-url("imagens/icones/fechar.svg");
+                    colorize: Tema.texto-fraco;
+                    width: 16px;
+                    height: 16px;
+                }
+
+                fechar := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.remover();
+                    }
+                }
+            }
+        }
+    }
 }
 
 component ItemMenu inherits Rectangle {
@@ -93,7 +208,12 @@ export component Janela inherits Window {
     in property <string> versao;
     in-out property <int> secao: 0;
     in property <string> renderizador;
+    in property <[Jogo]> jogos;
+    in property <string> resumo;
+    in property <bool> arrastando;
+    in-out property <int> selecionado: -1;
     callback adicionar();
+    callback remover(int);
 
     title: "xiso-manager";
     icon: @image-url("imagens/icone.svg");
@@ -215,12 +335,20 @@ export component Janela inherits Window {
 
             HorizontalLayout {
                 spacing: 12px;
-                Text {
-                    text: "Biblioteca";
-                    color: Tema.texto;
-                    font-size: 24px;
-                    font-weight: 700;
-                    vertical-alignment: center;
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: "Biblioteca";
+                        color: Tema.texto;
+                        font-size: 24px;
+                        font-weight: 700;
+                    }
+
+                    if root.resumo != "": Text {
+                        text: root.resumo;
+                        color: Tema.texto-fraco;
+                        font-size: 12px;
+                    }
                 }
 
                 Rectangle { }
@@ -233,29 +361,49 @@ export component Janela inherits Window {
                 }
             }
 
-            // área da lista; vazia por enquanto
+            // a lista de jogos; vazia, o convite para adicionar
             Rectangle {
                 vertical-stretch: 1;
-                background: Tema.painel;
-                border-width: 1px;
-                border-color: Tema.painel-borda;
+                background: root.jogos.length == 0 || root.arrastando ? Tema.painel : transparent;
+                border-width: root.jogos.length == 0 || root.arrastando ? 1px : 0;
+                border-color: root.arrastando ? Tema.realce : Tema.painel-borda;
                 border-radius: Tema.raio;
 
-                VerticalLayout {
-                    alignment: center;
-                    spacing: 12px;
-                    Image {
-                        source: @image-url("imagens/icone.svg");
-                        height: 72px;
-                        image-fit: contain;
-                        opacity: 0.35;
+                if root.jogos.length > 0: ListView {
+                    for jogo[i] in root.jogos: VerticalLayout {
+                        padding-bottom: 8px;
+                        Cartao {
+                            jogo: jogo;
+                            selecionado: root.selecionado == i;
+                            clicado => {
+                                root.selecionado = i;
+                            }
+                            remover => {
+                                root.remover(i);
+                            }
+                        }
                     }
+                }
 
-                    Text {
-                        text: "Arraste ISOs para cá ou clique em Adicionar";
-                        color: Tema.texto-fraco;
-                        font-size: 15px;
-                        horizontal-alignment: center;
+                if root.jogos.length == 0 || root.arrastando: Rectangle {
+                    background: root.arrastando ? #14171ce6 : transparent;
+                    border-radius: Tema.raio;
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 12px;
+                        Image {
+                            source: @image-url("imagens/icone.svg");
+                            height: 72px;
+                            image-fit: contain;
+                            opacity: root.arrastando ? 1 : 0.35;
+                        }
+
+                        Text {
+                            text: root.arrastando ? "Solte para adicionar" : "Arraste ISOs (ou uma pasta com ISOs) para cá, ou clique em Adicionar";
+                            color: root.arrastando ? Tema.realce : Tema.texto-fraco;
+                            font-size: 15px;
+                            horizontal-alignment: center;
+                        }
                     }
                 }
             }
