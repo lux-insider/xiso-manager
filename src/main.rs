@@ -6,26 +6,7 @@
 //!
 //! Códigos de saída: 0 sucesso | 1 erro fatal | 130 Ctrl+C
 
-mod saida;
-
-mod acoes;
-mod caminhos;
-mod config;
-mod disco;
-mod entrada;
-mod estilo;
-mod eventos;
-mod executar;
-mod ferramentas;
-mod iso;
-mod log;
-mod menu;
-mod navegador;
-mod selecao;
-mod sinais;
-mod terminal;
-mod textos;
-mod unicode_tabelas;
+use xiso_manager::{entrada, estilo, log, menu, saida, say, sinais, terminal};
 
 fn main() {
     let ansi = terminal::preparar_console();

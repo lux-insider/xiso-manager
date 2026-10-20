@@ -1,0 +1,292 @@
+// Janela principal do xiso-manager.
+//
+// Desempenho: nada se move sem motivo. Sem animações contínuas e sem
+// desfoque; o painel translúcido é só cor com transparência. O disco é um
+// SVG desenhado uma vez e guardado pelo Slint.
+
+export global Tema {
+    out property <color> fundo: #14171c;
+    out property <color> lateral: #101317;
+    out property <color> painel: #ffffff0d;
+    out property <color> painel-borda: #ffffff1a;
+    out property <color> realce: #4ade80;
+    out property <color> realce-fundo: #4ade801f;
+    out property <color> texto: #e6edf3;
+    out property <color> texto-fraco: #8b949e;
+    out property <length> raio: 10px;
+}
+
+component ItemMenu inherits Rectangle {
+    in property <image> icone;
+    in property <string> texto;
+    in property <bool> ativo;
+    callback clicado;
+
+    height: 40px;
+    border-radius: 8px;
+    background: root.ativo ? Tema.realce-fundo : toque.has-hover ? #ffffff0a : transparent;
+
+    // marca verde do item ativo
+    Rectangle {
+        x: 0;
+        width: 3px;
+        height: 20px;
+        border-radius: 2px;
+        background: root.ativo ? Tema.realce : transparent;
+    }
+
+    HorizontalLayout {
+        padding-left: 16px;
+        spacing: 12px;
+        Image {
+            source: root.icone;
+            colorize: root.ativo ? Tema.realce : Tema.texto-fraco;
+            width: 20px;
+            height: 20px;
+            y: (parent.height - self.height) / 2;
+        }
+
+        Text {
+            text: root.texto;
+            font-size: 14px;
+            font-weight: root.ativo ? 600 : 400;
+            color: root.ativo ? Tema.texto : Tema.texto-fraco;
+            vertical-alignment: center;
+        }
+    }
+
+    toque := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicado();
+        }
+    }
+}
+
+component Botao inherits Rectangle {
+    in property <string> texto;
+    callback clicado;
+
+    height: 36px;
+    min-width: 120px;
+    border-radius: 8px;
+    background: toque.pressed ? #3bc46e : toque.has-hover ? #5ef093 : Tema.realce;
+
+    Text {
+        text: root.texto;
+        color: #0b1a10;
+        font-size: 14px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    toque := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicado();
+        }
+    }
+}
+
+export component Janela inherits Window {
+    in property <string> versao;
+    in-out property <int> secao: 0;
+    in property <string> renderizador;
+    callback adicionar();
+
+    title: "xiso-manager";
+    icon: @image-url("imagens/icone.svg");
+    preferred-width: 1100px;
+    preferred-height: 700px;
+    min-width: 900px;
+    min-height: 560px;
+    background: Tema.fundo;
+    default-font-size: 14px;
+
+    HorizontalLayout {
+        // ── barra lateral ───────────────────────────────────────────────
+        Rectangle {
+            width: 230px;
+            background: Tema.lateral;
+
+            VerticalLayout {
+                padding: 16px;
+                padding-top: 24px;
+                spacing: 4px;
+
+                Image {
+                    source: @image-url("imagens/disco.svg");
+                    height: 190px;
+                    image-fit: contain;
+                }
+
+                Text {
+                    text: "XISO-MANAGER";
+                    color: Tema.texto;
+                    font-size: 18px;
+                    font-weight: 700;
+                    letter-spacing: 2px;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: "v" + root.versao;
+                    color: Tema.texto-fraco;
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                }
+
+                Rectangle {
+                    height: 20px;
+                }
+
+                ItemMenu {
+                    icone: @image-url("imagens/icones/biblioteca.svg");
+                    texto: "Biblioteca";
+                    ativo: root.secao == 0;
+                    clicado => {
+                        root.secao = 0;
+                    }
+                }
+
+                ItemMenu {
+                    icone: @image-url("imagens/icones/converter.svg");
+                    texto: "Converter para GOD";
+                    ativo: root.secao == 1;
+                    clicado => {
+                        root.secao = 1;
+                    }
+                }
+
+                ItemMenu {
+                    icone: @image-url("imagens/icones/extrair.svg");
+                    texto: "Extrair";
+                    ativo: root.secao == 2;
+                    clicado => {
+                        root.secao = 2;
+                    }
+                }
+
+                ItemMenu {
+                    icone: @image-url("imagens/icones/criar.svg");
+                    texto: "Criar ISO";
+                    ativo: root.secao == 3;
+                    clicado => {
+                        root.secao = 3;
+                    }
+                }
+
+                ItemMenu {
+                    icone: @image-url("imagens/icones/reescrever.svg");
+                    texto: "Reescrever";
+                    ativo: root.secao == 4;
+                    clicado => {
+                        root.secao = 4;
+                    }
+                }
+
+                ItemMenu {
+                    icone: @image-url("imagens/icones/verificar.svg");
+                    texto: "Verificar";
+                    ativo: root.secao == 5;
+                    clicado => {
+                        root.secao = 5;
+                    }
+                }
+
+                Rectangle { }
+
+                ItemMenu {
+                    icone: @image-url("imagens/icones/configuracoes.svg");
+                    texto: "Configurações";
+                    ativo: root.secao == 6;
+                    clicado => {
+                        root.secao = 6;
+                    }
+                }
+            }
+        }
+
+        // ── conteúdo ────────────────────────────────────────────────────
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+
+            HorizontalLayout {
+                spacing: 12px;
+                Text {
+                    text: "Biblioteca";
+                    color: Tema.texto;
+                    font-size: 24px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { }
+
+                Botao {
+                    texto: "+ Adicionar";
+                    clicado => {
+                        root.adicionar();
+                    }
+                }
+            }
+
+            // área da lista; vazia por enquanto
+            Rectangle {
+                vertical-stretch: 1;
+                background: Tema.painel;
+                border-width: 1px;
+                border-color: Tema.painel-borda;
+                border-radius: Tema.raio;
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 12px;
+                    Image {
+                        source: @image-url("imagens/icone.svg");
+                        height: 72px;
+                        image-fit: contain;
+                        opacity: 0.35;
+                    }
+
+                    Text {
+                        text: "Arraste ISOs para cá ou clique em Adicionar";
+                        color: Tema.texto-fraco;
+                        font-size: 15px;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            // ── painel de tarefas ───────────────────────────────────────
+            Rectangle {
+                height: 64px;
+                background: Tema.painel;
+                border-width: 1px;
+                border-color: Tema.painel-borda;
+                border-radius: Tema.raio;
+
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    Text {
+                        text: "Nenhuma tarefa em andamento";
+                        color: Tema.texto-fraco;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle { }
+
+                    Text {
+                        text: root.renderizador;
+                        color: #8b949e80;
+                        font-size: 11px;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
