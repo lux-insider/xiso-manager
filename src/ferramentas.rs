@@ -266,7 +266,14 @@ static CANCELA: Mutex<Option<HashMap<(OsString, OsString), bool>>> = Mutex::new(
 /// Subcomandos das ferramentas -pt. O extract-xiso oficial usa opções
 /// (`-x`, `-l`...) e nunca é consultado.
 const SUBCOMANDOS_PT: [&str; 8] = [
-    "listar", "extrair", "criar", "reescrever", "verificar", "dats", "converter", "info",
+    "listar",
+    "extrair",
+    "criar",
+    "reescrever",
+    "verificar",
+    "dats",
+    "converter",
+    "info",
 ];
 
 /// A ferramenta aceita `--cancelar-pela-entrada` (extract-xiso-pt 0.2.4 e
