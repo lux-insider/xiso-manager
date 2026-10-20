@@ -1,6 +1,6 @@
 [package]
 name = "xiso-manager"
-version = "4.0.1"
+version = "4.1.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Gerenciador interativo, em português, para imagens ISO de Xbox e Xbox 360"
@@ -12,12 +12,43 @@ publish = false
 # Só para o teste do pacote do Windows: XM_ERRO_FATAL=1 provoca um erro
 # fatal na abertura (o binário publicado não tem isso).
 teste-erro-fatal = []
+# A janela (xiso-manager-gui). Fora dela, o menu do terminal compila sem o
+# Slint e continua leve.
+gui = ["dep:slint", "dep:slint-build", "dep:rfd", "dep:png"]
+
+[[bin]]
+name = "xiso-manager"
+path = "src/main.rs"
+
+[[bin]]
+name = "xiso-manager-gui"
+path = "src/gui/main.rs"
+required-features = ["gui"]
 
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 regex = "1"
 same-file = "1"
 serde_json = { version = "1", features = ["preserve_order"] }
+# Desenho pela placa de vídeo (FemtoVG, OpenGL); sem ela, o software assume.
+# Sem os recursos padrão: acessibilidade e o backend Qt pesam e não são usados.
+slint = { version = "1.18", optional = true, default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "backend-winit",
+    "renderer-femtovg",
+    "renderer-software",
+    "unstable-winit-030",
+] }
+
+# Seletor de arquivos nativo (no Linux, o portal do sistema; sem GTK).
+rfd = { version = "0.17", optional = true, default-features = false, features = ["xdg-portal"] }
+# Ícone dos jogos (PNG dentro do default.xex), lido pelo iso2god.
+png = { version = "0.18", optional = true }
+
+[build-dependencies]
+embed-resource = "3.0"
+slint-build = { version = "1.18", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

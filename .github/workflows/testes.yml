@@ -49,6 +49,15 @@ jobs:
         run: cargo test
       - name: Compilar
         run: cargo build --release
+      # A janela (xiso-manager-gui, Slint). No Linux o Slint precisa das
+      # bibliotecas de fontes e de teclado do sistema.
+      - name: Bibliotecas da janela
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev
+      - name: Clippy da janela
+        run: cargo clippy --all-targets --features gui -- -D warnings
+      - name: Compilar a janela
+        run: cargo build --release --features gui --bin xiso-manager-gui
       - name: Compilar a versão do teste de erro fatal (V-4)
         if: runner.os == 'Windows'
         shell: pwsh

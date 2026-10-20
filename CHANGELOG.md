@@ -5,6 +5,7 @@ antiga. As versões seguem o [Versionamento Semântico](https://semver.org/lang/
 
 | Versão | Data | Destaque |
 |---|---|---|
+| [4.1.0](#410--2026-10-20) | 20/10/2026 | A janela: biblioteca, ações, fila e selo do Redump |
 | [4.0.1](#401--2026-10-20) | 20/10/2026 | Cancelamento limpo no Windows sem encerrar à força |
 | [4.0.0](#400--2026-10-18) | 18/10/2026 | Reescrito em Rust: um executável só, sem Python |
 | [3.2.9](#329--2026-10-02) | 02/10/2026 | Assistente com o extract-xiso oficial e config.json estragado |
@@ -20,6 +21,31 @@ antiga. As versões seguem o [Versionamento Semântico](https://semver.org/lang/
 | [3.1.1](#311--2026-09-29) | 29/09/2026 | Nome e ícone dos jogos de Xbox 360 |
 | [3.1](#31--2026-09-29) | 29/09/2026 | Versão para Windows e auditoria |
 | [3.0](#30--2026-09-24) | 24/09/2026 | Primeira versão pública |
+
+---
+
+## 4.1.0 — 2026-10-20
+
+### Adicionado
+- **A janela (`xiso-manager-gui`)**, ao lado do menu no terminal, com a
+  mesma lógica por baixo:
+  - **Biblioteca:** arrastar ISOs ou pastas para a janela, ou o botão
+    Adicionar. Nome, ícone, Title ID e tipo de disco lidos da ISO, com cache
+    (300 jogos abrem em menos de 1 segundo).
+  - **Converter para GOD, Extrair, Criar ISO, Reescrever e Verificar**, com
+    barra, velocidade e tempo que falta.
+  - **Cancelar** apaga o que a ferramenta já tinha gravado, também no
+    Windows. Fechar a janela no meio de uma tarefa cancela e espera a
+    limpeza.
+  - **Fila** de tarefas e **Fazer com todos os jogos da Biblioteca**.
+  - **Selo** no cartão depois de Verificar: ✓ Redump, Íntegra ou Não
+    confere.
+  - **Configurações:** ferramentas (com a versão encontrada), pasta padrão,
+    threads e desenho pelo processador (padrão, ~30 MB) ou pela placa de
+    vídeo.
+  - A ISO reescrita sugerida nunca é um arquivo que já existe, e nada é
+    substituído sem a caixa "Substituir" marcada.
+- Ícone do programa nos executáveis do Windows (menu e janela).
 
 ---
 
