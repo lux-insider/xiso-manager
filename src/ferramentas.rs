@@ -261,6 +261,51 @@ pub fn iso2god_proprio() -> bool {
     proprio
 }
 
+static CANCELA: Mutex<Option<HashMap<(OsString, OsString), bool>>> = Mutex::new(None);
+
+/// Subcomandos das ferramentas -pt. O extract-xiso oficial usa opções
+/// (`-x`, `-l`...) e nunca é consultado.
+const SUBCOMANDOS_PT: [&str; 8] = [
+    "listar", "extrair", "criar", "reescrever", "verificar", "dats", "converter", "info",
+];
+
+/// A ferramenta aceita `--cancelar-pela-entrada` (extract-xiso-pt 0.2.4 e
+/// iso2god-pt 0.1.6 em diante)? Com ela, o cancelamento sem Ctrl+C fecha a
+/// entrada da ferramenta, que para e apaga o que criou; sem ela, no Windows,
+/// só resta encerrar à força. O `--help` roda uma vez por binário e comando.
+pub fn cancela_pela_entrada(cmd: &[OsString]) -> bool {
+    let (Some(binario), Some(sub)) = (cmd.first(), cmd.get(1)) else {
+        return false;
+    };
+    if !SUBCOMANDOS_PT.iter().any(|s| sub.as_os_str() == *s) {
+        return false;
+    }
+    let chave = (binario.clone(), sub.clone());
+    if let Some(r) = CANCELA
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get_or_insert_with(HashMap::new)
+        .get(&chave)
+    {
+        return *r;
+    }
+    let aceita = match capturar(
+        &[binario.clone(), sub.clone(), "--help".into()],
+        Duration::from_secs(10),
+    ) {
+        Ok((status, saida, _)) => {
+            status.success() && String::from_utf8_lossy(&saida).contains("--cancelar-pela-entrada")
+        }
+        Err(_) => false,
+    };
+    CANCELA
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get_or_insert_with(HashMap::new)
+        .insert(chave, aceita);
+    aceita
+}
+
 pub fn exigir_binario(caminho: &Path, nome: &str) -> bool {
     if caminhos::executavel(caminho) {
         return true;

@@ -5,6 +5,7 @@ antiga. As versões seguem o [Versionamento Semântico](https://semver.org/lang/
 
 | Versão | Data | Destaque |
 |---|---|---|
+| [4.0.1](#401--2026-10-20) | 20/10/2026 | Cancelamento limpo no Windows sem encerrar à força |
 | [4.0.0](#400--2026-10-18) | 18/10/2026 | Reescrito em Rust: um executável só, sem Python |
 | [3.2.9](#329--2026-10-02) | 02/10/2026 | Assistente com o extract-xiso oficial e config.json estragado |
 | [3.2.8](#328--2026-10-02) | 02/10/2026 | Confirmação antes de sobrescrever e janela de erro no Windows |
@@ -19,6 +20,22 @@ antiga. As versões seguem o [Versionamento Semântico](https://semver.org/lang/
 | [3.1.1](#311--2026-09-29) | 29/09/2026 | Nome e ícone dos jogos de Xbox 360 |
 | [3.1](#31--2026-09-29) | 29/09/2026 | Versão para Windows e auditoria |
 | [3.0](#30--2026-09-24) | 24/09/2026 | Primeira versão pública |
+
+---
+
+## 4.0.1 — 2026-10-20
+
+### Corrigido
+- **Windows:** quando o menu precisava parar a ferramenta sem Ctrl+C (ex.:
+  ela não saía no prazo), encerrava à força, e a pasta ou o arquivo pela
+  metade ficavam no disco. Com o extract-xiso-pt 0.2.4 e o iso2god-pt
+  0.1.6, que aceitam `--cancelar-pela-entrada`, o menu pede o cancelamento
+  fechando a entrada da ferramenta, e ela apaga o que criou. Ferramentas
+  mais antigas continuam funcionando como antes.
+
+### Alterado
+- Usa o extract-xiso-pt 0.2.4 e o iso2god-pt 0.1.6 (ajuda e erros de uso em
+  português, avisos do executável do jogo explicados).
 
 ---
 
