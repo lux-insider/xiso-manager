@@ -1009,7 +1009,7 @@ export component Janela inherits Window {
                         spacing: 24px;
                         alignment: start;
                         Opcao {
-                            texto: "Processador (recomendado, ~25 MB)";
+                            texto: "Processador (recomendado, ~30 MB)";
                             marcado: !root.cfg-gpu;
                             clicado => {
                                 root.cfg-gpu = false;
@@ -1017,7 +1017,7 @@ export component Janela inherits Window {
                         }
 
                         Opcao {
-                            texto: "Placa de vídeo (OpenGL, ~95 MB)";
+                            texto: "Placa de vídeo (OpenGL, ~100 MB)";
                             marcado: root.cfg-gpu;
                             clicado => {
                                 root.cfg-gpu = true;

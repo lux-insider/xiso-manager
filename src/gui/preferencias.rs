@@ -42,8 +42,8 @@ fn gravar(chave: &str, valor: Value) {
     }
 }
 
-/// Desenhar pela placa de vídeo? O padrão é o software: gasta ~25 MB de
-/// memória contra ~95 MB do driver de vídeo, e nesta janela, que só
+/// Desenhar pela placa de vídeo? O padrão é o software: gasta ~30 MB de
+/// memória contra ~100 MB do driver de vídeo, e nesta janela, que só
 /// redesenha o pedaço que muda, é rápido do mesmo jeito.
 pub fn usar_gpu() -> bool {
     if let Some(v) = std::env::var_os("XM_GPU") {
