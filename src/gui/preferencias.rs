@@ -76,3 +76,17 @@ pub fn salvar_biblioteca<'a>(caminhos: impl Iterator<Item = &'a Path>) {
         .collect();
     gravar("biblioteca", Value::Array(lista));
 }
+
+/// A última pasta de destino dos pacotes GOD (vazio: a pasta padrão do
+/// config.json).
+pub fn destino_god() -> String {
+    ler()
+        .get("destino_god")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string()
+}
+
+pub fn salvar_destino_god(pasta: &str) {
+    gravar("destino_god", Value::String(pasta.into()));
+}

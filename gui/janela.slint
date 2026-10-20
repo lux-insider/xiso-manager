@@ -33,6 +33,7 @@ export struct Jogo {
 component Cartao inherits Rectangle {
     in property <Jogo> jogo;
     in property <bool> selecionado;
+    in property <bool> removivel: true;
     callback clicado;
     callback remover;
 
@@ -112,7 +113,7 @@ component Cartao inherits Rectangle {
                 height: 32px;
                 border-radius: 6px;
                 background: fechar.has-hover ? #ffffff1a : transparent;
-                visible: toque.has-hover || fechar.has-hover;
+                visible: root.removivel && (toque.has-hover || fechar.has-hover);
                 Image {
                     source: @image-url("imagens/icones/fechar.svg");
                     colorize: Tema.texto-fraco;
@@ -180,27 +181,216 @@ component ItemMenu inherits Rectangle {
 
 component Botao inherits Rectangle {
     in property <string> texto;
+    in property <bool> ativo: true;
+    // secundário: só a borda, para ações que não são a principal da tela
+    in property <bool> secundario;
     callback clicado;
 
     height: 36px;
     min-width: 120px;
     border-radius: 8px;
-    background: toque.pressed ? #3bc46e : toque.has-hover ? #5ef093 : Tema.realce;
+    opacity: root.ativo ? 1 : 0.4;
+    background: root.secundario ? (toque.has-hover && root.ativo ? #ffffff14 : transparent) : toque.pressed ? #3bc46e : toque.has-hover && root.ativo ? #5ef093 : Tema.realce;
+    border-width: root.secundario ? 1px : 0;
+    border-color: Tema.painel-borda;
 
-    Text {
-        text: root.texto;
-        color: #0b1a10;
-        font-size: 14px;
-        font-weight: 600;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        Text {
+            text: root.texto;
+            color: root.secundario ? Tema.texto : #0b1a10;
+            font-size: 14px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
     }
 
     toque := TouchArea {
-        mouse-cursor: pointer;
+        enabled: root.ativo;
+        mouse-cursor: root.ativo ? pointer : default;
         clicked => {
             root.clicado();
         }
+    }
+}
+
+// Caixa de marcar no tema da janela (a do Slint fica azul).
+component CheckBox inherits Rectangle {
+    in property <string> text;
+    in-out property <bool> checked;
+    in property <bool> enabled: true;
+
+    height: 28px;
+    opacity: root.enabled ? 1 : 0.4;
+    HorizontalLayout {
+        spacing: 10px;
+        alignment: start;
+        Rectangle {
+            width: 18px;
+            height: 18px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 4px;
+            background: root.checked ? Tema.realce : transparent;
+            border-width: root.checked ? 0 : 1.5px;
+            border-color: toque.has-hover && root.enabled ? Tema.texto : Tema.texto-fraco;
+            if root.checked: Image {
+                source: @image-url("imagens/icones/marca.svg");
+                colorize: #0b1a10;
+                width: 12px;
+                height: 12px;
+            }
+        }
+
+        Text {
+            text: root.text;
+            color: Tema.texto;
+            vertical-alignment: center;
+        }
+    }
+
+    toque := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            root.checked = !root.checked;
+        }
+    }
+}
+
+// Número com menos e mais.
+component SpinBox inherits Rectangle {
+    in property <int> minimum;
+    in property <int> maximum;
+    in-out property <int> value;
+    in property <bool> enabled: true;
+
+    height: 36px;
+    border-radius: 8px;
+    background: #0b0d10;
+    border-width: 1px;
+    border-color: Tema.painel-borda;
+    opacity: root.enabled ? 1 : 0.4;
+    HorizontalLayout {
+        menos := Rectangle {
+            width: 34px;
+            border-radius: 8px;
+            background: toque-menos.has-hover && root.enabled ? #ffffff14 : transparent;
+            Text {
+                text: "−";
+                color: Tema.texto;
+                font-size: 16px;
+            }
+
+            toque-menos := TouchArea {
+                enabled: root.enabled;
+                clicked => {
+                    root.value = max(root.minimum, root.value - 1);
+                }
+            }
+        }
+
+        Text {
+            text: root.value;
+            color: Tema.texto;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        Rectangle {
+            width: 34px;
+            border-radius: 8px;
+            background: toque-mais.has-hover && root.enabled ? #ffffff14 : transparent;
+            Text {
+                text: "+";
+                color: Tema.texto;
+                font-size: 16px;
+            }
+
+            toque-mais := TouchArea {
+                enabled: root.enabled;
+                clicked => {
+                    root.value = min(root.maximum, root.value + 1);
+                }
+            }
+        }
+    }
+}
+
+// Um caminho escolhido pelo usuário, com o botão para trocar.
+component CampoCaminho inherits VerticalLayout {
+    in property <string> rotulo;
+    in property <string> caminho;
+    in property <string> vazio: "Nenhum escolhido";
+    in property <bool> ativo: true;
+    callback escolher;
+
+    spacing: 6px;
+    Text {
+        text: root.rotulo;
+        color: Tema.texto-fraco;
+        font-size: 12px;
+    }
+
+    HorizontalLayout {
+        spacing: 10px;
+        Rectangle {
+            height: 36px;
+            horizontal-stretch: 1;
+            border-radius: 8px;
+            background: #0b0d10;
+            border-width: 1px;
+            border-color: Tema.painel-borda;
+            opacity: root.ativo ? 1 : 0.4;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                Text {
+                    text: root.caminho != "" ? root.caminho : root.vazio;
+                    color: root.caminho != "" ? Tema.texto : Tema.texto-fraco;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+        }
+
+        Botao {
+            texto: "Escolher…";
+            secundario: true;
+            horizontal-stretch: 0;
+            ativo: root.ativo;
+            clicado => {
+                root.escolher();
+            }
+        }
+    }
+}
+
+component Painel inherits Rectangle {
+    background: Tema.painel;
+    border-width: 1px;
+    border-color: Tema.painel-borda;
+    border-radius: Tema.raio;
+}
+
+// Cabeçalho das páginas de ação.
+component Titulo inherits VerticalLayout {
+    in property <string> titulo;
+    in property <string> descricao;
+    spacing: 4px;
+    Text {
+        text: root.titulo;
+        color: Tema.texto;
+        font-size: 24px;
+        font-weight: 700;
+    }
+
+    Text {
+        text: root.descricao;
+        color: Tema.texto-fraco;
+        font-size: 13px;
+        wrap: word-wrap;
     }
 }
 
@@ -211,16 +401,54 @@ export component Janela inherits Window {
     in property <[Jogo]> jogos;
     in property <string> resumo;
     in property <bool> arrastando;
-    in-out property <int> selecionado: -1;
+    in property <int> selecionado: -1;
     callback adicionar();
     callback remover(int);
+    callback selecionar(int);
+
+    // opções das ações
+    in property <string> destino-god;
+    in-out property <int> threads: 4;
+    in-out property <bool> cortar-fim: true;
+    in property <string> destino-extrair;
+    in-out property <bool> pular-atualizacao;
+    // "substituir se já existir", um por tela: marcado numa não vale na outra
+    in-out property <bool> sobrescrever-extrair;
+    in-out property <bool> sobrescrever-criar;
+    in-out property <bool> sobrescrever-reescrever;
+    in-out property <bool> liberar-midia;
+    in property <string> pasta-criar;
+    in property <string> saida-criar;
+    in-out property <bool> substituir-original;
+    in property <string> saida-reescrever;
+    in property <string> aviso-acao;
+    // 1 destino do GOD, 2 destino da extração, 3 pasta do jogo (criar),
+    // 4 ISO a criar, 5 ISO reescrita
+    callback escolher(int);
+    // 1 converter, 2 extrair, 3 criar, 4 reescrever, 5 verificar
+    callback iniciar(int);
+
+    // a tarefa: 0 nenhuma, 1 rodando, 2 concluída, 3 erro, 4 cancelada,
+    // 5 concluída com ressalva (verificar: não confere)
+    in property <int> tarefa-estado;
+    in property <string> tarefa-titulo;
+    in property <string> tarefa-detalhe;
+    in property <float> tarefa-fracao: -1;
+    in property <string> tarefa-pasta;
+    in property <bool> cancelando;
+    callback cancelar();
+    callback abrir-pasta();
+    callback limpar-tarefa();
+
+    property <bool> ocupado: root.tarefa-estado == 1;
+    property <bool> tem-jogo: root.selecionado >= 0 && root.selecionado < root.jogos.length;
 
     title: "xiso-manager";
     icon: @image-url("imagens/icone.svg");
     preferred-width: 1100px;
-    preferred-height: 700px;
+    preferred-height: 720px;
     min-width: 900px;
-    min-height: 560px;
+    min-height: 600px;
     background: Tema.fundo;
     default-font-size: 14px;
 
@@ -333,90 +561,312 @@ export component Janela inherits Window {
             padding: 24px;
             spacing: 16px;
 
-            HorizontalLayout {
-                spacing: 12px;
-                VerticalLayout {
-                    alignment: center;
-                    Text {
-                        text: "Biblioteca";
-                        color: Tema.texto;
-                        font-size: 24px;
-                        font-weight: 700;
+            // Biblioteca
+            if root.secao == 0: VerticalLayout {
+                spacing: 16px;
+                vertical-stretch: 1;
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: "Biblioteca";
+                            color: Tema.texto;
+                            font-size: 24px;
+                            font-weight: 700;
+                        }
+
+                        if root.resumo != "": Text {
+                            text: root.resumo;
+                            color: Tema.texto-fraco;
+                            font-size: 12px;
+                        }
                     }
 
-                    if root.resumo != "": Text {
-                        text: root.resumo;
-                        color: Tema.texto-fraco;
-                        font-size: 12px;
+                    Rectangle { }
+
+                    Botao {
+                        texto: "+ Adicionar";
+                        clicado => {
+                            root.adicionar();
+                        }
                     }
                 }
 
-                Rectangle { }
+                // a lista de jogos; vazia, o convite para adicionar
+                Rectangle {
+                    vertical-stretch: 1;
+                    background: root.jogos.length == 0 || root.arrastando ? Tema.painel : transparent;
+                    border-width: root.jogos.length == 0 || root.arrastando ? 1px : 0;
+                    border-color: root.arrastando ? Tema.realce : Tema.painel-borda;
+                    border-radius: Tema.raio;
 
-                Botao {
-                    texto: "+ Adicionar";
-                    clicado => {
-                        root.adicionar();
+                    if root.jogos.length > 0: ListView {
+                        for jogo[i] in root.jogos: VerticalLayout {
+                            padding-bottom: 8px;
+                            Cartao {
+                                jogo: jogo;
+                                selecionado: root.selecionado == i;
+                                clicado => {
+                                    root.selecionar(i);
+                                }
+                                remover => {
+                                    root.remover(i);
+                                }
+                            }
+                        }
+                    }
+
+                    if root.jogos.length == 0 || root.arrastando: Rectangle {
+                        background: root.arrastando ? #14171ce6 : transparent;
+                        border-radius: Tema.raio;
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 12px;
+                            Image {
+                                source: @image-url("imagens/icone.svg");
+                                height: 72px;
+                                image-fit: contain;
+                                opacity: root.arrastando ? 1 : 0.35;
+                            }
+
+                            Text {
+                                text: root.arrastando ? "Solte para adicionar" : "Arraste ISOs (ou uma pasta com ISOs) para cá, ou clique em Adicionar";
+                                color: root.arrastando ? Tema.realce : Tema.texto-fraco;
+                                font-size: 15px;
+                                horizontal-alignment: center;
+                            }
+                        }
                     }
                 }
             }
 
-            // a lista de jogos; vazia, o convite para adicionar
-            Rectangle {
+            // Páginas de ação: o jogo escolhido na Biblioteca, as opções e
+            // o botão Iniciar.
+            if root.secao >= 1 && root.secao <= 5: VerticalLayout {
+                spacing: 18px;
                 vertical-stretch: 1;
-                background: root.jogos.length == 0 || root.arrastando ? Tema.painel : transparent;
-                border-width: root.jogos.length == 0 || root.arrastando ? 1px : 0;
-                border-color: root.arrastando ? Tema.realce : Tema.painel-borda;
-                border-radius: Tema.raio;
 
-                if root.jogos.length > 0: ListView {
-                    for jogo[i] in root.jogos: VerticalLayout {
-                        padding-bottom: 8px;
-                        Cartao {
-                            jogo: jogo;
-                            selecionado: root.selecionado == i;
+                Titulo {
+                    titulo: root.secao == 1 ? "Converter para GOD" : root.secao == 2 ? "Extrair" : root.secao == 3 ? "Criar ISO" : root.secao == 4 ? "Reescrever" : "Verificar";
+                    descricao: root.secao == 1 ? "Transforma a ISO num pacote Games on Demand, que o console abre pelo disco rígido (Aurora, FreeStyle)." : root.secao == 2 ? "Copia todos os arquivos de dentro da ISO para uma pasta." : root.secao == 3 ? "Monta uma ISO a partir da pasta de um jogo de Xbox ou Xbox 360." : root.secao == 4 ? "Regrava a ISO enxuta: tira a partição de vídeo e o espaço vazio, sem perder nada do jogo." : "Lê a ISO inteira, confere a estrutura e compara com o Redump (se os .dat estiverem instalados).";
+                }
+
+                // o jogo (menos no Criar, que parte de uma pasta)
+                if root.secao != 3 && root.tem-jogo: Cartao {
+                    jogo: root.jogos[root.selecionado];
+                    selecionado: true;
+                    removivel: false;
+                    clicado => {
+                        root.secao = 0;
+                    }
+                }
+                if root.secao != 3 && !root.tem-jogo: Painel {
+                    height: 84px;
+                    HorizontalLayout {
+                        padding: 16px;
+                        spacing: 12px;
+                        Text {
+                            text: "Escolha um jogo na Biblioteca.";
+                            color: Tema.texto-fraco;
+                            vertical-alignment: center;
+                        }
+
+                        Rectangle { }
+
+                        Botao {
+                            texto: "Ir para a Biblioteca";
+                            secundario: true;
+                            y: (parent.height - self.height) / 2;
                             clicado => {
-                                root.selecionado = i;
-                            }
-                            remover => {
-                                root.remover(i);
+                                root.secao = 0;
                             }
                         }
                     }
                 }
 
-                if root.jogos.length == 0 || root.arrastando: Rectangle {
-                    background: root.arrastando ? #14171ce6 : transparent;
-                    border-radius: Tema.raio;
-                    VerticalLayout {
-                        alignment: center;
-                        spacing: 12px;
-                        Image {
-                            source: @image-url("imagens/icone.svg");
-                            height: 72px;
-                            image-fit: contain;
-                            opacity: root.arrastando ? 1 : 0.35;
-                        }
-
-                        Text {
-                            text: root.arrastando ? "Solte para adicionar" : "Arraste ISOs (ou uma pasta com ISOs) para cá, ou clique em Adicionar";
-                            color: root.arrastando ? Tema.realce : Tema.texto-fraco;
-                            font-size: 15px;
-                            horizontal-alignment: center;
+                // opções
+                if root.secao == 1: VerticalLayout {
+                    spacing: 14px;
+                    CampoCaminho {
+                        rotulo: "Pasta de destino (o pacote fica em <pasta>/<Title ID>/…)";
+                        caminho: root.destino-god;
+                        ativo: !root.ocupado;
+                        escolher => {
+                            root.escolher(1);
                         }
                     }
+
+                    HorizontalLayout {
+                        spacing: 24px;
+                        alignment: start;
+                        HorizontalLayout {
+                            spacing: 10px;
+                            Text {
+                                text: "Threads";
+                                color: Tema.texto-fraco;
+                                vertical-alignment: center;
+                            }
+
+                            SpinBox {
+                                width: 110px;
+                                minimum: 1;
+                                maximum: 32;
+                                value <=> root.threads;
+                                enabled: !root.ocupado;
+                            }
+                        }
+
+                        CheckBox {
+                            text: "Cortar o espaço vazio do fim da ISO";
+                            checked <=> root.cortar-fim;
+                            enabled: !root.ocupado;
+                        }
+                    }
+                }
+
+                if root.secao == 2: VerticalLayout {
+                    spacing: 14px;
+                    CampoCaminho {
+                        rotulo: "Pasta de destino";
+                        caminho: root.destino-extrair;
+                        ativo: !root.ocupado;
+                        escolher => {
+                            root.escolher(2);
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 24px;
+                        alignment: start;
+                        CheckBox {
+                            text: "Pular a atualização do console ($SystemUpdate)";
+                            checked <=> root.pular-atualizacao;
+                            enabled: !root.ocupado;
+                        }
+
+                        CheckBox {
+                            text: "Substituir o que já existir na pasta";
+                            checked <=> root.sobrescrever-extrair;
+                            enabled: !root.ocupado;
+                        }
+                    }
+                }
+
+                if root.secao == 3: VerticalLayout {
+                    spacing: 14px;
+                    CampoCaminho {
+                        rotulo: "Pasta do jogo (com o default.xex ou default.xbe)";
+                        caminho: root.pasta-criar;
+                        ativo: !root.ocupado;
+                        escolher => {
+                            root.escolher(3);
+                        }
+                    }
+
+                    CampoCaminho {
+                        rotulo: "ISO a criar";
+                        caminho: root.saida-criar;
+                        vazio: "Escolha primeiro a pasta do jogo";
+                        ativo: !root.ocupado && root.pasta-criar != "";
+                        escolher => {
+                            root.escolher(4);
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 24px;
+                        alignment: start;
+                        CheckBox {
+                            text: "Liberar a checagem de mídia (Xbox original)";
+                            checked <=> root.liberar-midia;
+                            enabled: !root.ocupado;
+                        }
+
+                        CheckBox {
+                            text: "Substituir a ISO se já existir";
+                            checked <=> root.sobrescrever-criar;
+                            enabled: !root.ocupado;
+                        }
+                    }
+                }
+
+                if root.secao == 4: VerticalLayout {
+                    spacing: 14px;
+                    CheckBox {
+                        text: "Trocar a ISO original pela reescrita (só depois de ela estar pronta e conferida)";
+                        checked <=> root.substituir-original;
+                        enabled: !root.ocupado;
+                    }
+
+                    CampoCaminho {
+                        rotulo: "ISO reescrita";
+                        caminho: root.substituir-original ? "no lugar da original" : root.saida-reescrever;
+                        ativo: !root.ocupado && !root.substituir-original;
+                        escolher => {
+                            root.escolher(5);
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 24px;
+                        alignment: start;
+                        CheckBox {
+                            text: "Liberar a checagem de mídia (Xbox original)";
+                            checked <=> root.liberar-midia;
+                            enabled: !root.ocupado;
+                        }
+
+                        CheckBox {
+                            text: "Substituir a ISO reescrita se já existir";
+                            checked <=> root.sobrescrever-reescrever;
+                            enabled: !root.ocupado && !root.substituir-original;
+                        }
+                    }
+                }
+
+                if root.aviso-acao != "": Text {
+                    text: root.aviso-acao;
+                    color: Tema.aviso;
+                    wrap: word-wrap;
+                }
+
+                Rectangle {
+                    vertical-stretch: 1;
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    Botao {
+                        texto: root.secao == 1 ? "Converter" : root.secao == 2 ? "Extrair" : root.secao == 3 ? "Criar ISO" : root.secao == 4 ? "Reescrever" : "Verificar";
+                        min-width: 160px;
+                        ativo: !root.ocupado && (root.secao == 3 ? root.pasta-criar != "" : root.tem-jogo);
+                        clicado => {
+                            root.iniciar(root.secao);
+                        }
+                    }
+                }
+            }
+
+            if root.secao == 6: VerticalLayout {
+                spacing: 18px;
+                vertical-stretch: 1;
+                Titulo {
+                    titulo: "Configurações";
+                    descricao: "Em breve: as ferramentas, a pasta padrão e o modo de desenho.";
+                }
+
+                Rectangle {
+                    vertical-stretch: 1;
                 }
             }
 
             // ── painel de tarefas ───────────────────────────────────────
-            Rectangle {
-                height: 64px;
-                background: Tema.painel;
-                border-width: 1px;
-                border-color: Tema.painel-borda;
-                border-radius: Tema.raio;
+            Painel {
+                height: root.tarefa-estado == 1 ? 96px : 64px;
+                border-color: root.tarefa-estado == 2 ? #4ade8066 : root.tarefa-estado == 3 ? #f8514966 : root.tarefa-estado == 5 ? #f0b42966 : Tema.painel-borda;
 
-                HorizontalLayout {
+                if root.tarefa-estado == 0: HorizontalLayout {
                     padding-left: 16px;
                     padding-right: 16px;
                     Text {
@@ -432,6 +882,120 @@ export component Janela inherits Window {
                         color: #8b949e80;
                         font-size: 11px;
                         vertical-alignment: center;
+                    }
+                }
+
+                if root.tarefa-estado == 1: VerticalLayout {
+                    padding: 14px;
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    spacing: 8px;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text {
+                            text: root.tarefa-titulo;
+                            color: Tema.texto;
+                            font-weight: 600;
+                            overflow: elide;
+                            vertical-alignment: center;
+                        }
+
+                        Rectangle { }
+
+                        Botao {
+                            texto: root.cancelando ? "Cancelando…" : "Cancelar";
+                            secundario: true;
+                            height: 30px;
+                            ativo: !root.cancelando;
+                            clicado => {
+                                root.cancelar();
+                            }
+                        }
+                    }
+
+                    // a barra; sem total conhecido, só o trilho
+                    Rectangle {
+                        height: 6px;
+                        border-radius: 3px;
+                        background: #ffffff14;
+                        Rectangle {
+                            x: 0;
+                            width: parent.width * max(0, min(1, root.tarefa-fracao));
+                            height: parent.height;
+                            border-radius: 3px;
+                            background: root.cancelando ? Tema.texto-fraco : Tema.realce;
+                        }
+                    }
+
+                    Text {
+                        text: root.tarefa-detalhe;
+                        color: Tema.texto-fraco;
+                        font-size: 12px;
+                        overflow: elide;
+                    }
+                }
+
+                if root.tarefa-estado >= 2: HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 10px;
+                    spacing: 10px;
+                    Text {
+                        text: root.tarefa-estado == 2 ? "✓" : root.tarefa-estado == 4 ? "■" : "!";
+                        color: root.tarefa-estado == 2 ? Tema.realce : root.tarefa-estado == 3 ? #f85149 : root.tarefa-estado == 5 ? Tema.aviso : Tema.texto-fraco;
+                        font-size: 18px;
+                        font-weight: 700;
+                        width: 20px;
+                        vertical-alignment: center;
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        spacing: 2px;
+                        Text {
+                            text: root.tarefa-titulo;
+                            color: Tema.texto;
+                            font-weight: 600;
+                            overflow: elide;
+                        }
+
+                        Text {
+                            text: root.tarefa-detalhe;
+                            color: Tema.texto-fraco;
+                            font-size: 12px;
+                            overflow: elide;
+                        }
+                    }
+
+                    if root.tarefa-pasta != "": Botao {
+                        texto: "Abrir pasta";
+                        secundario: true;
+                        height: 30px;
+                        y: (parent.height - self.height) / 2;
+                        clicado => {
+                            root.abrir-pasta();
+                        }
+                    }
+
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 6px;
+                        background: limpar.has-hover ? #ffffff1a : transparent;
+                        Image {
+                            source: @image-url("imagens/icones/fechar.svg");
+                            colorize: Tema.texto-fraco;
+                            width: 16px;
+                            height: 16px;
+                        }
+
+                        limpar := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.limpar-tarefa();
+                            }
+                        }
                     }
                 }
             }
