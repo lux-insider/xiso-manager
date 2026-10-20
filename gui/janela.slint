@@ -9,8 +9,12 @@ import { ListView } from "std-widgets.slint";
 
 export global Tema {
     out property <color> fundo: #14171c;
-    out property <color> lateral: #101317;
-    out property <color> painel: #ffffff0d;
+    out property <color> lateral: #0b0e11d0;
+    // quase opaco: a matriz do fundo não pode atrapalhar a leitura
+    out property <color> painel: #12161be8;
+    out property <color> painel-hover: #1a1f26ec;
+    out property <color> painel-lendo: #12161be7;
+    out property <color> selecionado: #142a1ced;
     out property <color> painel-borda: #ffffff1a;
     out property <color> realce: #4ade80;
     out property <color> realce-fundo: #4ade801f;
@@ -45,7 +49,7 @@ component Cartao inherits Rectangle {
     // ela termina, o cartão inteiro é redesenhado. Sem isso, no desenho por
     // software sobrava um pedaço do nome antigo (a perna do "j" de
     // "jogo.iso" sai um pouco para fora da área do texto).
-    background: root.selecionado ? Tema.realce-fundo : toque.has-hover ? #ffffff12 : root.jogo.lendo ? #ffffff0c : Tema.painel;
+    background: root.selecionado ? Tema.selecionado : toque.has-hover ? Tema.painel-hover : root.jogo.lendo ? Tema.painel-lendo : Tema.painel;
     border-width: 1px;
     border-color: root.selecionado ? Tema.realce : Tema.painel-borda;
 
@@ -214,7 +218,7 @@ component Botao inherits Rectangle {
     min-width: 120px;
     border-radius: 8px;
     opacity: root.ativo ? 1 : 0.4;
-    background: root.secundario ? (toque.has-hover && root.ativo ? #ffffff14 : transparent) : toque.pressed ? #3bc46e : toque.has-hover && root.ativo ? #5ef093 : Tema.realce;
+    background: root.secundario ? (toque.has-hover && root.ativo ? Tema.painel-hover : Tema.painel) : toque.pressed ? #3bc46e : toque.has-hover && root.ativo ? #5ef093 : Tema.realce;
     border-width: root.secundario ? 1px : 0;
     border-color: Tema.painel-borda;
 
@@ -530,13 +534,21 @@ export component Janela inherits Window {
     property <bool> tem-jogo: root.selecionado >= 0 && root.selecionado < root.jogos.length;
 
     title: "xiso-manager";
-    icon: @image-url("imagens/icone.svg");
+    icon: @image-url("imagens/logo.png");
     preferred-width: 1100px;
     preferred-height: 720px;
     min-width: 900px;
     min-height: 600px;
     background: Tema.fundo;
     default-font-size: 14px;
+
+    // a matriz binária, escurecida; desenhada uma vez e guardada
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: @image-url("imagens/fundo.jpg");
+        image-fit: cover;
+    }
 
     HorizontalLayout {
         // ── barra lateral ───────────────────────────────────────────────
@@ -550,18 +562,9 @@ export component Janela inherits Window {
                 spacing: 4px;
 
                 Image {
-                    source: @image-url("imagens/disco.svg");
+                    source: @image-url("imagens/logo.png");
                     height: 190px;
                     image-fit: contain;
-                }
-
-                Text {
-                    text: "XISO-MANAGER";
-                    color: Tema.texto;
-                    font-size: 18px;
-                    font-weight: 700;
-                    letter-spacing: 2px;
-                    horizontal-alignment: center;
                 }
 
                 Text {
