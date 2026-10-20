@@ -1,6 +1,6 @@
 [package]
 name = "xiso-manager"
-version = "4.0.0"
+version = "4.0.1"
 edition = "2024"
 rust-version = "1.88"
 description = "Gerenciador interativo, em português, para imagens ISO de Xbox e Xbox 360"

@@ -191,14 +191,42 @@ pub fn esperar_pid(pid: i32, prazo: Duration) -> bool {
     true
 }
 
-/// Pede à ferramenta que pare (SIGTERM; no Windows, encerra).
+/// A entrada das ferramentas que cancelam quando ela fecha
+/// (`--cancelar-pela-entrada`), por PID.
+static ENTRADAS: Mutex<Vec<(i32, std::process::ChildStdin)>> = Mutex::new(Vec::new());
+
+pub fn guardar_entrada(pid: i32, entrada: std::process::ChildStdin) {
+    ENTRADAS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .push((pid, entrada));
+}
+
+/// Fecha a entrada da ferramenta, se ela foi aberta com
+/// `--cancelar-pela-entrada`: é o pedido para cancelar. Devolve se havia.
+pub fn soltar_entrada(pid: i32) -> bool {
+    let mut lista = ENTRADAS.lock().unwrap_or_else(|e| e.into_inner());
+    let antes = lista.len();
+    lista.retain(|(p, _)| *p != pid);
+    lista.len() != antes
+}
+
+/// Pede à ferramenta que pare: fecha a entrada dela, se ela cancela por
+/// aí, e manda SIGTERM. No Windows não há SIGTERM: sem a entrada para
+/// fechar, só resta encerrar à força.
 pub fn pedir_parada(pid: i32) {
+    let fechou = soltar_entrada(pid);
     #[cfg(unix)]
-    unsafe {
-        libc::kill(pid, libc::SIGTERM);
+    {
+        let _ = fechou;
+        unsafe {
+            libc::kill(pid, libc::SIGTERM);
+        }
     }
     #[cfg(windows)]
-    matar(pid);
+    if !fechou {
+        matar(pid);
+    }
 }
 
 /// Encerra à força.
@@ -426,6 +454,39 @@ mod testes {
         assert_eq!(pendentes(), 0);
         limpar_estado();
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Com a entrada guardada, o pedido para parar fecha a entrada (o
+    /// cancelamento das ferramentas com `--cancelar-pela-entrada`). No
+    /// Windows a ferramenta não é mais encerrada à força: sai sozinha, com
+    /// o código dela.
+    #[test]
+    fn pedir_parada_fecha_a_entrada() {
+        let _g = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let (programa, args): (&str, &[&str]) = if cfg!(windows) {
+            ("cmd", &["/c", "more >NUL & exit 42"])
+        } else {
+            ("sh", &["-c", "cat >/dev/null; exit 42"])
+        };
+        let mut filho = std::process::Command::new(programa)
+            .args(args)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let pid = filho.id() as i32;
+        guardar_entrada(pid, filho.stdin.take().unwrap());
+        std::thread::sleep(Duration::from_millis(200));
+        assert!(vivo(pid), "esperando a entrada");
+        // no Unix o SIGTERM do pedir_parada mataria o sh antes do exit 42
+        if cfg!(windows) {
+            pedir_parada(pid);
+        } else {
+            assert!(soltar_entrada(pid));
+        }
+        assert!(!soltar_entrada(pid));
+        let status = filho.wait().unwrap();
+        assert_eq!(status.code(), Some(42));
     }
 
     #[test]

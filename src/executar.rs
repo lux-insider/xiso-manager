@@ -593,13 +593,24 @@ fn vigiar(pid: i32, terminou: Arc<AtomicBool>) {
 fn abrir(cmd: &[OsString]) -> std::io::Result<(Child, std::io::PipeReader)> {
     let (leitor, escritor) = std::io::pipe()?;
     let escritor_erro = escritor.try_clone()?;
+    let pela_entrada = crate::ferramentas::cancela_pela_entrada(cmd);
     let mut comando = Command::new(&cmd[0]);
     comando
         .args(&cmd[1..])
-        .stdin(Stdio::null())
+        .stdin(if pela_entrada {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(escritor)
         .stderr(escritor_erro);
-    let filho = comando.spawn()?;
+    if pela_entrada {
+        comando.arg("--cancelar-pela-entrada");
+    }
+    let mut filho = comando.spawn()?;
+    if let Some(entrada) = filho.stdin.take() {
+        sinais::guardar_entrada(filho.id() as i32, entrada);
+    }
     // o Command guarda as pontas de escrita: sem soltá-las, a leitura nunca
     // veria o fim da saída
     drop(comando);
@@ -731,6 +742,7 @@ pub fn executar(cmd: &[OsString], label: &str, op: Opcoes) -> Resultado {
             }
             terminou.store(true, Ordering::SeqCst);
             sinais::FILHO.store(0, Ordering::SeqCst);
+            sinais::soltar_entrada(pid);
             let fim = Instant::now() + Duration::from_secs(1);
             while !leitura.is_finished() && Instant::now() < fim {
                 std::thread::sleep(Duration::from_millis(10));
