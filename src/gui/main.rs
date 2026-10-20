@@ -14,6 +14,7 @@ mod preferencias;
 mod tarefa;
 
 use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::mpsc;
@@ -34,13 +35,13 @@ fn escolher_renderizador() -> &'static str {
             .select()
             .is_ok()
     {
-        return "GPU (OpenGL)";
+        return "placa de vídeo";
     }
     let _ = slint::BackendSelector::new()
         .backend_name("winit".into())
         .renderer_name("software".into())
         .select();
-    "software"
+    "processador"
 }
 
 thread_local! {
@@ -53,6 +54,18 @@ thread_local! {
     static CANCELAR_AO_ABRIR: Cell<bool> = const { Cell::new(false) };
     /// A janela foi fechada com uma tarefa rodando: sai quando ela acabar.
     static SAIR_AO_FIM: Cell<bool> = const { Cell::new(false) };
+    /// Os pedidos esperando a vez, e o comando do que está rodando.
+    static FILA: RefCell<VecDeque<acoes::Pedido>> = const { RefCell::new(VecDeque::new()) };
+    static RODANDO: RefCell<Option<Vec<std::ffi::OsString>>> = const { RefCell::new(None) };
+    static PLACAR: RefCell<Placar> = RefCell::new(Placar::default());
+}
+
+/// O balanço de uma fila: quantas rodaram, e as que deram errado.
+#[derive(Default)]
+struct Placar {
+    total: usize,
+    falhas: Vec<String>,
+    ressalvas: usize,
 }
 
 /// Os jogos da janela, como o Slint os mostra.
@@ -119,6 +132,7 @@ fn adicionar(janela: &Janela, caminhos: Vec<PathBuf>, leitor: &mpsc::Sender<Path
             icone: Default::default(),
             tem_icone: false,
             lendo: true,
+            selo: 0,
         });
         let _ = leitor.send(c);
         mudou = true;
@@ -174,6 +188,7 @@ fn iniciar_leitor(janela: slint::Weak<Janela>) -> mpsc::Sender<PathBuf> {
                                 tem_icone: icone.is_some(),
                                 icone: icone.unwrap_or_default(),
                                 lendo: false,
+                                selo: info.selo,
                             },
                         );
                     });
@@ -337,21 +352,165 @@ fn reler(janela: &Janela, caminho: PathBuf, leitor: &mpsc::Sender<PathBuf>) {
     }
 }
 
-fn iniciar(janela: &Janela, secao: i32, leitor: &mpsc::Sender<PathBuf>) {
-    if janela.get_tarefa_estado() == 1 {
-        return;
+/// Os pedidos de uma página: o jogo escolhido, ou todos da Biblioteca.
+fn pedidos(janela: &Janela, acao: acoes::Acao) -> Result<Vec<acoes::Pedido>, String> {
+    let base = opcoes(janela);
+    if !janela.get_todos() || acao == acoes::Acao::Criar {
+        return acoes::montar(acao, &base).map(|p| vec![p]);
     }
+    let jogos: Vec<Jogo> = modelo(janela).iter().collect();
+    if jogos.is_empty() {
+        return Err("A Biblioteca está vazia.".into());
+    }
+    jogos
+        .iter()
+        .map(|j| {
+            let iso = PathBuf::from(j.caminho.as_str());
+            let o = acoes::Opcoes {
+                nome: j.nome.to_string(),
+                // cada um ao lado da sua ISO
+                destino_extrair: acoes::padrao_extrair(&iso).to_string_lossy().into_owned(),
+                saida_reescrever: acoes::padrao_reescrever(&iso)
+                    .to_string_lossy()
+                    .into_owned(),
+                iso: Some(iso),
+                ..opcoes(janela)
+            };
+            acoes::montar(acao, &o).map_err(|e| format!("{}: {e}", j.nome))
+        })
+        .collect()
+}
+
+/// Iniciar (ou pôr na fila, com uma tarefa rodando).
+fn iniciar(janela: &Janela, secao: i32, leitor: &mpsc::Sender<PathBuf>) {
     let Some(acao) = acoes::Acao::da_secao(secao) else {
         return;
     };
-    let pedido = match acoes::montar(acao, &opcoes(janela)) {
+    let novos = match pedidos(janela, acao) {
         Ok(p) => p,
         Err(e) => {
             janela.set_aviso_acao(e.into());
             return;
         }
     };
-    janela.set_aviso_acao("".into());
+    // o mesmo pedido duas vezes não entra
+    let rodando = RODANDO.with(|r| r.borrow().clone());
+    let (mut entraram, mut repetidos) = (0, 0);
+    FILA.with(|f| {
+        let mut fila = f.borrow_mut();
+        for p in novos {
+            if rodando.as_ref() == Some(&p.cmd) || fila.iter().any(|q| q.cmd == p.cmd) {
+                repetidos += 1;
+            } else {
+                fila.push_back(p);
+                entraram += 1;
+            }
+        }
+        janela.set_fila(fila.len() as i32);
+    });
+    let ocupado = janela.get_tarefa_estado() == 1;
+    janela.set_aviso_acao(match (ocupado, entraram, repetidos) {
+        (_, 0, _) => "Isso já está na fila.".into(),
+        (true, 1, 0) => "Posto na fila.".into(),
+        (true, n, 0) => format!("{n} postos na fila.").into(),
+        (_, _, r) if r > 0 => format!("{r} já estava(m) na fila e ficou(aram) de fora.").into(),
+        _ => "".into(),
+    });
+    if !ocupado && entraram > 0 {
+        PLACAR.with(|p| *p.borrow_mut() = Placar::default());
+        proxima(janela, leitor);
+    }
+}
+
+/// Começa o próximo da fila. Fila vazia: mostra o balanço, se rodou mais
+/// de um.
+fn proxima(janela: &Janela, leitor: &mpsc::Sender<PathBuf>) {
+    let pedido = FILA.with(|f| {
+        let mut fila = f.borrow_mut();
+        let p = fila.pop_front();
+        janela.set_fila(fila.len() as i32);
+        p
+    });
+    match pedido {
+        Some(p) => rodar(janela, p, leitor),
+        None => {
+            RODANDO.with(|r| r.borrow_mut().take());
+            let placar = PLACAR.with(|p| std::mem::take(&mut *p.borrow_mut()));
+            if placar.total > 1 {
+                let ultima = janela.get_tarefa_titulo();
+                let falhas = placar.falhas.len();
+                if falhas == 0 && placar.ressalvas == 0 {
+                    janela.set_tarefa_estado(acoes::PRONTA);
+                    janela.set_tarefa_titulo(
+                        format!("Fila concluída: as {} tarefas deram certo", placar.total).into(),
+                    );
+                } else {
+                    janela.set_tarefa_estado(if falhas > 0 {
+                        acoes::FALHOU
+                    } else {
+                        acoes::RESSALVA
+                    });
+                    janela.set_tarefa_titulo(
+                        format!(
+                            "Fila concluída: {} de {} deram certo",
+                            placar.total - falhas - placar.ressalvas,
+                            placar.total
+                        )
+                        .into(),
+                    );
+                }
+                let mut detalhe = Vec::new();
+                if falhas > 0 {
+                    detalhe.push(format!("Falharam: {}", placar.falhas.join(", ")));
+                }
+                if placar.ressalvas > 0 {
+                    detalhe.push(format!("{} não conferem com o Redump", placar.ressalvas));
+                }
+                if detalhe.is_empty() {
+                    detalhe.push(format!("Última: {ultima}"));
+                }
+                janela.set_tarefa_detalhe(detalhe.join("  ·  ").into());
+            }
+            if SAIR_AO_FIM.get() {
+                let _ = janela.hide();
+                let _ = slint::quit_event_loop();
+            }
+        }
+    }
+}
+
+/// O fim de uma tarefa, na thread da janela.
+fn terminou(janela: &Janela, r: acoes::Resultado, nome: String, leitor: &mpsc::Sender<PathBuf>) {
+    TAREFA.with(|t| t.borrow_mut().take());
+    janela.set_cancelando(false);
+    let total = PLACAR.with(|p| {
+        let mut p = p.borrow_mut();
+        p.total += 1;
+        match r.estado {
+            acoes::FALHOU => p.falhas.push(nome),
+            acoes::RESSALVA => p.ressalvas += 1,
+            _ => {}
+        }
+        p.total
+    });
+    let cancelada = r.estado == acoes::CANCELADA;
+    janela.set_tarefa_estado(r.estado);
+    janela.set_tarefa_titulo(r.titulo.into());
+    janela.set_tarefa_detalhe(r.detalhe.into());
+    // o que a tarefa gravou pode ocupar o caminho sugerido
+    let aviso = janela.get_aviso_acao();
+    sugerir(janela);
+    janela.set_aviso_acao(aviso);
+    if cancelada {
+        // cancelar para tudo: o balanço da fila não interessa
+        FILA.with(|f| f.borrow_mut().clear());
+        janela.set_fila(0);
+        PLACAR.with(|p| p.borrow_mut().total = total.min(1));
+    }
+    proxima(janela, leitor);
+}
+
+fn rodar(janela: &Janela, pedido: acoes::Pedido, leitor: &mpsc::Sender<PathBuf>) {
     janela.set_tarefa_estado(1);
     janela.set_tarefa_titulo(pedido.titulo().into());
     janela.set_tarefa_detalhe("Preparando…".into());
@@ -360,6 +519,7 @@ fn iniciar(janela: &Janela, secao: i32, leitor: &mpsc::Sender<PathBuf>) {
     janela.set_cancelando(false);
     CANCELAR_AO_ABRIR.set(false);
     TAREFA.with(|t| t.borrow_mut().take());
+    RODANDO.with(|r| *r.borrow_mut() = Some(pedido.cmd.clone()));
 
     let fraca = janela.as_weak();
     let leitor = leitor.clone();
@@ -370,6 +530,7 @@ fn iniciar(janela: &Janela, secao: i32, leitor: &mpsc::Sender<PathBuf>) {
         let nome = pedido.nome.clone();
         let f_andar = fraca.clone();
         let f_fim = fraca.clone();
+        let l_fim = leitor.clone();
         let aberta = tarefa::iniciar(
             cmd,
             move |a| {
@@ -378,6 +539,7 @@ fn iniciar(janela: &Janela, secao: i32, leitor: &mpsc::Sender<PathBuf>) {
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(janela) = fraca.upgrade()
                         && janela.get_tarefa_estado() == 1
+                        && !janela.get_cancelando()
                     {
                         janela.set_tarefa_fracao(fracao);
                         janela.set_tarefa_detalhe(detalhe.into());
@@ -396,27 +558,23 @@ fn iniciar(janela: &Janela, secao: i32, leitor: &mpsc::Sender<PathBuf>) {
                 let iso_nova = matches!(fim, tarefa::Fim::Ok { .. })
                     .then_some(pedido.iso_nova)
                     .flatten();
+                let selo = acoes::selo(&fim).zip(pedido.iso);
+                if let Some((s, iso)) = &selo {
+                    biblioteca::marcar_selo(iso, *s);
+                }
+                let nome = pedido.nome;
                 let _ = slint::invoke_from_event_loop(move || {
                     let Some(janela) = f_fim.upgrade() else {
                         return;
                     };
-                    TAREFA.with(|t| t.borrow_mut().take());
-                    janela.set_cancelando(false);
-                    janela.set_tarefa_estado(r.estado);
-                    janela.set_tarefa_titulo(r.titulo.into());
-                    janela.set_tarefa_detalhe(r.detalhe.into());
-                    janela.set_tarefa_pasta(pasta.as_deref().map(texto).unwrap_or_default());
                     if let Some(iso) = iso_nova {
-                        reler(&janela, iso, &leitor);
+                        reler(&janela, iso, &l_fim);
                     }
-                    // o que a tarefa gravou pode ocupar o caminho sugerido
-                    let aviso = janela.get_aviso_acao();
-                    sugerir(&janela);
-                    janela.set_aviso_acao(aviso);
-                    if SAIR_AO_FIM.get() {
-                        let _ = janela.hide();
-                        let _ = slint::quit_event_loop();
+                    if let Some((s, iso)) = selo {
+                        mostrar_selo(&janela, &iso, s);
                     }
+                    janela.set_tarefa_pasta(pasta.as_deref().map(texto).unwrap_or_default());
+                    terminou(&janela, r, nome, &l_fim);
                 });
             },
         );
@@ -432,20 +590,33 @@ fn iniciar(janela: &Janela, secao: i32, leitor: &mpsc::Sender<PathBuf>) {
                     TAREFA.with(|t| *t.borrow_mut() = Some(cancelador));
                 }
                 Err(e) => {
-                    janela.set_tarefa_estado(acoes::FALHOU);
-                    janela.set_tarefa_titulo(format!("Não deu certo: {nome}").into());
-                    janela.set_tarefa_detalhe(e.into());
-                    if SAIR_AO_FIM.get() {
-                        let _ = janela.hide();
-                        let _ = slint::quit_event_loop();
-                    }
+                    let r = acoes::Resultado {
+                        estado: acoes::FALHOU,
+                        titulo: format!("Não deu certo: {nome}"),
+                        detalhe: e,
+                    };
+                    terminou(&janela, r, nome, &leitor);
                 }
             }
         });
     });
 }
 
+fn mostrar_selo(janela: &Janela, iso: &Path, selo: i32) {
+    let m = modelo(janela);
+    let texto = iso.to_string_lossy();
+    if let Some(linha) = m.iter().position(|j| j.caminho.as_str() == texto) {
+        let mut jogo = m.row_data(linha).expect("linha existe");
+        jogo.selo = selo;
+        m.set_row_data(linha, jogo);
+    }
+    // grava já: um selo é o resultado de minutos de leitura
+    biblioteca::salvar_cache(&caminhos_da_lista(&m));
+}
+
+/// Cancelar para a tarefa e esvazia a fila.
 fn cancelar(janela: &Janela) {
+    esvaziar_fila(janela);
     if janela.get_tarefa_estado() != 1 {
         return;
     }
@@ -455,6 +626,11 @@ fn cancelar(janela: &Janela) {
         Some(c) => c.cancelar(),
         None => CANCELAR_AO_ABRIR.set(true),
     });
+}
+
+fn esvaziar_fila(janela: &Janela) {
+    FILA.with(|f| f.borrow_mut().clear());
+    janela.set_fila(0);
 }
 
 /// Abre a pasta no gerenciador de arquivos do sistema.
@@ -522,6 +698,12 @@ fn ligar_acoes(janela: &Janela, leitor: mpsc::Sender<PathBuf>) {
         }
     });
     let fraca = janela.as_weak();
+    janela.on_esvaziar_fila(move || {
+        if let Some(janela) = fraca.upgrade() {
+            esvaziar_fila(&janela);
+        }
+    });
+    let fraca = janela.as_weak();
     janela.on_limpar_tarefa(move || {
         if let Some(janela) = fraca.upgrade()
             && janela.get_tarefa_estado() != 1
@@ -544,6 +726,123 @@ fn ligar_acoes(janela: &Janela, leitor: mpsc::Sender<PathBuf>) {
             slint::CloseRequestResponse::KeepWindowShown
         } else {
             slint::CloseRequestResponse::HideWindow
+        }
+    });
+}
+
+// ── configurações ───────────────────────────────────────────────────────
+
+/// "versão 0.2.4", ou o que falta. Roda as ferramentas: fora da thread da
+/// janela.
+fn estado_ferramenta(bin: &Path, subcomando: &str) -> String {
+    if !bin.is_file() {
+        return "não encontrado".into();
+    }
+    let versao = ferramentas::capturar(
+        &[bin.as_os_str().to_os_string(), "--version".into()],
+        std::time::Duration::from_secs(10),
+    )
+    .ok()
+    .filter(|(status, _, _)| status.success())
+    .and_then(|(_, saida, _)| {
+        String::from_utf8_lossy(&saida)
+            .split_whitespace()
+            .last()
+            .map(String::from)
+    });
+    let Some(versao) = versao else {
+        return "não respondeu ao --version".into();
+    };
+    let cmd = [bin.as_os_str().to_os_string(), subcomando.into()];
+    if ferramentas::cancela_pela_entrada(&cmd) {
+        format!("versão {versao}  ✓")
+    } else {
+        format!("versão {versao}: antiga ou não é a -pt, a janela precisa de uma mais nova")
+    }
+}
+
+/// Mostra os caminhos do config.json e confere as ferramentas.
+fn mostrar_configuracoes(janela: &Janela) {
+    let (extract, god) = (config::bin_extract(), config::bin_god());
+    janela.set_cfg_extract(texto(&extract));
+    janela.set_cfg_iso2god(texto(&god));
+    janela.set_cfg_pasta(texto(Path::new(&config::pasta_padrao())));
+    janela.set_cfg_extract_estado("conferindo…".into());
+    janela.set_cfg_iso2god_estado("conferindo…".into());
+    let fraca = janela.as_weak();
+    std::thread::spawn(move || {
+        let e = estado_ferramenta(&extract, "extrair");
+        let g = estado_ferramenta(&god, "converter");
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(janela) = fraca.upgrade() {
+                janela.set_cfg_extract_estado(e.into());
+                janela.set_cfg_iso2god_estado(g.into());
+            }
+        });
+    });
+}
+
+fn cfg_escolher(janela: &Janela, campo: i32) {
+    let inicial = match campo {
+        1 => PathBuf::from(config::pasta_padrao()),
+        2 => caminhos::pasta_de(&config::bin_extract()),
+        _ => caminhos::pasta_de(&config::bin_god()),
+    };
+    let fraca = janela.as_weak();
+    std::thread::spawn(move || {
+        let dialogo = rfd::FileDialog::new().set_directory(disco::pasta_existente(&inicial));
+        let escolhido = match campo {
+            1 => dialogo.set_title("Pasta padrão").pick_folder(),
+            2 => dialogo.set_title("extract-xiso-pt").pick_file(),
+            _ => dialogo.set_title("iso2god-pt").pick_file(),
+        };
+        let Some(escolhido) = escolhido else {
+            return;
+        };
+        let _ = slint::invoke_from_event_loop(move || {
+            let Some(janela) = fraca.upgrade() else {
+                return;
+            };
+            let valor = escolhido.into_os_string();
+            match campo {
+                1 => config::mudar(|c| c.pasta_padrao = valor),
+                2 => {
+                    ferramentas::garantir_permissao(Path::new(&valor));
+                    config::mudar(|c| c.bin_extract_xiso = valor);
+                }
+                _ => {
+                    ferramentas::garantir_permissao(Path::new(&valor));
+                    config::mudar(|c| c.bin_iso2god = valor);
+                }
+            }
+            mostrar_configuracoes(&janela);
+        });
+    });
+}
+
+fn ligar_configuracoes(janela: &Janela) {
+    janela.set_cfg_threads(config::threads_god().clamp(1, 32) as i32);
+    janela.set_cfg_gpu(preferencias::gpu_gravada());
+    mostrar_configuracoes(janela);
+
+    let fraca = janela.as_weak();
+    janela.on_cfg_escolher(move |campo| {
+        if let Some(janela) = fraca.upgrade() {
+            cfg_escolher(&janela, campo);
+        }
+    });
+    let fraca = janela.as_weak();
+    janela.on_cfg_mudou(move || {
+        let Some(janela) = fraca.upgrade() else {
+            return;
+        };
+        let threads = i64::from(janela.get_cfg_threads().clamp(1, 32));
+        if threads != config::threads_god() {
+            config::mudar(|c| c.threads_god = threads);
+        }
+        let gpu = janela.get_cfg_gpu();
+        if gpu != preferencias::gpu_gravada() {
+            preferencias::salvar_gpu(gpu);
         }
     });
 }
@@ -614,6 +913,7 @@ fn main() -> Result<(), slint::PlatformError> {
     });
 
     ligar_acoes(&janela, leitor);
+    ligar_configuracoes(&janela);
 
     let resultado = janela.run();
     biblioteca::salvar_cache(&caminhos_da_lista(&modelo(&janela)));

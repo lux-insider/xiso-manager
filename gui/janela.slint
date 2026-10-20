@@ -28,6 +28,8 @@ export struct Jogo {
     icone: image,
     tem-icone: bool,
     lendo: bool,
+    // depois de verificar: 1 idêntica ao Redump, 2 íntegra, 3 não confere
+    selo: int,
 }
 
 component Cartao inherits Rectangle {
@@ -81,6 +83,7 @@ component Cartao inherits Rectangle {
 
         VerticalLayout {
             alignment: center;
+            horizontal-stretch: 1;
             spacing: 4px;
             Text {
                 text: root.jogo.nome;
@@ -102,6 +105,27 @@ component Cartao inherits Rectangle {
                 color: Tema.aviso;
                 font-size: 12px;
                 overflow: elide;
+            }
+        }
+
+        if root.jogo.selo > 0 && !root.jogo.lendo: VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            Rectangle {
+                height: 24px;
+                border-radius: 12px;
+                background: root.jogo.selo == 1 ? #4ade8026 : root.jogo.selo == 3 ? #f0b42926 : #ffffff12;
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    Text {
+                        text: root.jogo.selo == 1 ? "✓ Redump" : root.jogo.selo == 3 ? "Não confere" : "Íntegra";
+                        color: root.jogo.selo == 1 ? Tema.realce : root.jogo.selo == 3 ? Tema.aviso : Tema.texto-fraco;
+                        font-size: 11px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                }
             }
         }
 
@@ -255,6 +279,45 @@ component CheckBox inherits Rectangle {
         mouse-cursor: root.enabled ? pointer : default;
         clicked => {
             root.checked = !root.checked;
+        }
+    }
+}
+
+// Uma escolha entre opções (bolinha).
+component Opcao inherits Rectangle {
+    in property <string> texto;
+    in property <bool> marcado;
+    callback clicado;
+
+    height: 28px;
+    HorizontalLayout {
+        spacing: 10px;
+        Rectangle {
+            width: 18px;
+            height: 18px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 9px;
+            border-width: 1.5px;
+            border-color: root.marcado ? Tema.realce : toque.has-hover ? Tema.texto : Tema.texto-fraco;
+            if root.marcado: Rectangle {
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: Tema.realce;
+            }
+        }
+
+        Text {
+            text: root.texto;
+            color: Tema.texto;
+            vertical-alignment: center;
+        }
+    }
+
+    toque := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicado();
         }
     }
 }
@@ -422,6 +485,7 @@ export component Janela inherits Window {
     in-out property <bool> substituir-original;
     in property <string> saida-reescrever;
     in property <string> aviso-acao;
+    in-out property <bool> todos;
     // 1 destino do GOD, 2 destino da extração, 3 pasta do jogo (criar),
     // 4 ISO a criar, 5 ISO reescrita
     callback escolher(int);
@@ -436,9 +500,31 @@ export component Janela inherits Window {
     in property <float> tarefa-fracao: -1;
     in property <string> tarefa-pasta;
     in property <bool> cancelando;
+    // pedidos esperando a vez
+    in property <int> fila;
+    callback esvaziar-fila();
     callback cancelar();
     callback abrir-pasta();
     callback limpar-tarefa();
+
+    // configurações
+    in property <string> cfg-extract;
+    in property <string> cfg-extract-estado;
+    in property <string> cfg-iso2god;
+    in property <string> cfg-iso2god-estado;
+    in property <string> cfg-pasta;
+    in-out property <int> cfg-threads: 4;
+    in-out property <bool> cfg-gpu;
+    // 1 pasta padrão, 2 extract-xiso-pt, 3 iso2god-pt
+    callback cfg-escolher(int);
+    changed cfg-threads => {
+        root.threads = root.cfg-threads;
+        root.cfg-mudou();
+    }
+    changed cfg-gpu => {
+        root.cfg-mudou();
+    }
+    callback cfg-mudou();
 
     property <bool> ocupado: root.tarefa-estado == 1;
     property <bool> tem-jogo: root.selecionado >= 0 && root.selecionado < root.jogos.length;
@@ -653,7 +739,19 @@ export component Janela inherits Window {
                 }
 
                 // o jogo (menos no Criar, que parte de uma pasta)
-                if root.secao != 3 && root.tem-jogo: Cartao {
+                if root.secao != 3 && root.todos && root.jogos.length > 0: Painel {
+                    height: 84px;
+                    HorizontalLayout {
+                        padding: 16px;
+                        Text {
+                            text: root.jogos.length == 1 ? "O jogo da Biblioteca" : "Os " + root.jogos.length + " jogos da Biblioteca, um depois do outro";
+                            color: Tema.texto;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+                if root.secao != 3 && !root.todos && root.tem-jogo: Cartao {
                     jogo: root.jogos[root.selecionado];
                     selecionado: true;
                     removivel: false;
@@ -661,7 +759,7 @@ export component Janela inherits Window {
                         root.secao = 0;
                     }
                 }
-                if root.secao != 3 && !root.tem-jogo: Painel {
+                if root.secao != 3 && !(root.todos && root.jogos.length > 0) && !root.tem-jogo: Painel {
                     height: 84px;
                     HorizontalLayout {
                         padding: 16px;
@@ -685,13 +783,17 @@ export component Janela inherits Window {
                     }
                 }
 
+                if root.secao != 3 && root.jogos.length > 1: CheckBox {
+                    text: "Fazer com todos os jogos da Biblioteca (" + root.jogos.length + ")";
+                    checked <=> root.todos;
+                }
+
                 // opções
                 if root.secao == 1: VerticalLayout {
                     spacing: 14px;
                     CampoCaminho {
                         rotulo: "Pasta de destino (o pacote fica em <pasta>/<Title ID>/…)";
                         caminho: root.destino-god;
-                        ativo: !root.ocupado;
                         escolher => {
                             root.escolher(1);
                         }
@@ -713,15 +815,13 @@ export component Janela inherits Window {
                                 minimum: 1;
                                 maximum: 32;
                                 value <=> root.threads;
-                                enabled: !root.ocupado;
-                            }
+                                    }
                         }
 
                         CheckBox {
                             text: "Cortar o espaço vazio do fim da ISO";
                             checked <=> root.cortar-fim;
-                            enabled: !root.ocupado;
-                        }
+                            }
                     }
                 }
 
@@ -729,8 +829,9 @@ export component Janela inherits Window {
                     spacing: 14px;
                     CampoCaminho {
                         rotulo: "Pasta de destino";
-                        caminho: root.destino-extrair;
-                        ativo: !root.ocupado;
+                        caminho: root.todos ? "" : root.destino-extrair;
+                        vazio: "Uma pasta ao lado de cada ISO, com o nome do jogo";
+                        ativo: !root.todos;
                         escolher => {
                             root.escolher(2);
                         }
@@ -742,14 +843,12 @@ export component Janela inherits Window {
                         CheckBox {
                             text: "Pular a atualização do console ($SystemUpdate)";
                             checked <=> root.pular-atualizacao;
-                            enabled: !root.ocupado;
-                        }
+                            }
 
                         CheckBox {
                             text: "Substituir o que já existir na pasta";
                             checked <=> root.sobrescrever-extrair;
-                            enabled: !root.ocupado;
-                        }
+                            }
                     }
                 }
 
@@ -758,7 +857,6 @@ export component Janela inherits Window {
                     CampoCaminho {
                         rotulo: "Pasta do jogo (com o default.xex ou default.xbe)";
                         caminho: root.pasta-criar;
-                        ativo: !root.ocupado;
                         escolher => {
                             root.escolher(3);
                         }
@@ -768,7 +866,7 @@ export component Janela inherits Window {
                         rotulo: "ISO a criar";
                         caminho: root.saida-criar;
                         vazio: "Escolha primeiro a pasta do jogo";
-                        ativo: !root.ocupado && root.pasta-criar != "";
+                        ativo: root.pasta-criar != "";
                         escolher => {
                             root.escolher(4);
                         }
@@ -780,14 +878,12 @@ export component Janela inherits Window {
                         CheckBox {
                             text: "Liberar a checagem de mídia (Xbox original)";
                             checked <=> root.liberar-midia;
-                            enabled: !root.ocupado;
-                        }
+                            }
 
                         CheckBox {
                             text: "Substituir a ISO se já existir";
                             checked <=> root.sobrescrever-criar;
-                            enabled: !root.ocupado;
-                        }
+                            }
                     }
                 }
 
@@ -796,13 +892,13 @@ export component Janela inherits Window {
                     CheckBox {
                         text: "Trocar a ISO original pela reescrita (só depois de ela estar pronta e conferida)";
                         checked <=> root.substituir-original;
-                        enabled: !root.ocupado;
                     }
 
                     CampoCaminho {
                         rotulo: "ISO reescrita";
-                        caminho: root.substituir-original ? "no lugar da original" : root.saida-reescrever;
-                        ativo: !root.ocupado && !root.substituir-original;
+                        caminho: root.substituir-original ? "no lugar da original" : root.todos ? "" : root.saida-reescrever;
+                        vazio: "<nome>.xiso.iso ao lado de cada ISO";
+                        ativo: !root.substituir-original && !root.todos;
                         escolher => {
                             root.escolher(5);
                         }
@@ -814,13 +910,12 @@ export component Janela inherits Window {
                         CheckBox {
                             text: "Liberar a checagem de mídia (Xbox original)";
                             checked <=> root.liberar-midia;
-                            enabled: !root.ocupado;
-                        }
+                            }
 
                         CheckBox {
                             text: "Substituir a ISO reescrita se já existir";
                             checked <=> root.sobrescrever-reescrever;
-                            enabled: !root.ocupado && !root.substituir-original;
+                            enabled: !root.substituir-original;
                         }
                     }
                 }
@@ -838,9 +933,9 @@ export component Janela inherits Window {
                 HorizontalLayout {
                     alignment: end;
                     Botao {
-                        texto: root.secao == 1 ? "Converter" : root.secao == 2 ? "Extrair" : root.secao == 3 ? "Criar ISO" : root.secao == 4 ? "Reescrever" : "Verificar";
+                        texto: root.ocupado ? "Pôr na fila" : root.secao == 1 ? "Converter" : root.secao == 2 ? "Extrair" : root.secao == 3 ? "Criar ISO" : root.secao == 4 ? "Reescrever" : "Verificar";
                         min-width: 160px;
-                        ativo: !root.ocupado && (root.secao == 3 ? root.pasta-criar != "" : root.tem-jogo);
+                        ativo: root.secao == 3 ? root.pasta-criar != "" : root.tem-jogo || (root.todos && root.jogos.length > 0);
                         clicado => {
                             root.iniciar(root.secao);
                         }
@@ -853,7 +948,85 @@ export component Janela inherits Window {
                 vertical-stretch: 1;
                 Titulo {
                     titulo: "Configurações";
-                    descricao: "Em breve: as ferramentas, a pasta padrão e o modo de desenho.";
+                    descricao: "As ferramentas, a pasta e as threads valem também para o menu do terminal (config.json).";
+                }
+
+                CampoCaminho {
+                    rotulo: "extract-xiso-pt  ·  " + root.cfg-extract-estado;
+                    caminho: root.cfg-extract;
+                    vazio: "Não encontrado";
+                    escolher => {
+                        root.cfg-escolher(2);
+                    }
+                }
+
+                CampoCaminho {
+                    rotulo: "iso2god-pt  ·  " + root.cfg-iso2god-estado;
+                    caminho: root.cfg-iso2god;
+                    vazio: "Não encontrado";
+                    escolher => {
+                        root.cfg-escolher(3);
+                    }
+                }
+
+                CampoCaminho {
+                    rotulo: "Pasta padrão (onde o Adicionar abre, e o destino inicial dos pacotes GOD)";
+                    caminho: root.cfg-pasta;
+                    escolher => {
+                        root.cfg-escolher(1);
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: start;
+                    Text {
+                        text: "Threads da conversão para GOD";
+                        color: Tema.texto-fraco;
+                        vertical-alignment: center;
+                    }
+
+                    SpinBox {
+                        width: 110px;
+                        minimum: 1;
+                        maximum: 32;
+                        value <=> root.cfg-threads;
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: "Desenho da janela";
+                        color: Tema.texto-fraco;
+                        font-size: 12px;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 24px;
+                        alignment: start;
+                        Opcao {
+                            texto: "Processador (recomendado, ~25 MB)";
+                            marcado: !root.cfg-gpu;
+                            clicado => {
+                                root.cfg-gpu = false;
+                            }
+                        }
+
+                        Opcao {
+                            texto: "Placa de vídeo (OpenGL, ~95 MB)";
+                            marcado: root.cfg-gpu;
+                            clicado => {
+                                root.cfg-gpu = true;
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "Agora: " + root.renderizador + (root.cfg-gpu != (root.renderizador != "processador") ? "  ·  a mudança vale na próxima vez que a janela abrir" : "");
+                        color: #8b949e;
+                        font-size: 12px;
+                    }
                 }
 
                 Rectangle {
@@ -900,10 +1073,26 @@ export component Janela inherits Window {
                             vertical-alignment: center;
                         }
 
+                        if root.fila > 0: Text {
+                            text: root.fila == 1 ? "mais 1 na fila" : "mais " + root.fila + " na fila";
+                            color: Tema.texto-fraco;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+
                         Rectangle { }
 
+                        if root.fila > 0 && !root.cancelando: Botao {
+                            texto: "Esvaziar fila";
+                            secundario: true;
+                            height: 30px;
+                            clicado => {
+                                root.esvaziar-fila();
+                            }
+                        }
+
                         Botao {
-                            texto: root.cancelando ? "Cancelando…" : "Cancelar";
+                            texto: root.cancelando ? "Cancelando…" : root.fila > 0 ? "Cancelar tudo" : "Cancelar";
                             secundario: true;
                             height: 30px;
                             ativo: !root.cancelando;

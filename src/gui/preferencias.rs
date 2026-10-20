@@ -90,3 +90,15 @@ pub fn destino_god() -> String {
 pub fn salvar_destino_god(pasta: &str) {
     gravar("destino_god", Value::String(pasta.into()));
 }
+
+pub fn salvar_gpu(ligada: bool) {
+    gravar("desenho_gpu", Value::Bool(ligada));
+}
+
+/// O que está gravado, sem a variável XM_GPU (que só vale para uma vez).
+pub fn gpu_gravada() -> bool {
+    ler()
+        .get("desenho_gpu")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}

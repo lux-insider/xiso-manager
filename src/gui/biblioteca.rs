@@ -25,6 +25,9 @@ pub struct Info {
     pub detalhe: String,
     pub aviso: String,
     pub icone_base64: Option<String>,
+    /// O resultado do último Verificar (0 nenhum, 1 idêntica ao Redump,
+    /// 2 íntegra, 3 não confere). Some quando o arquivo muda.
+    pub selo: i32,
 }
 
 impl Info {
@@ -77,6 +80,11 @@ pub fn carregar_cache() {
                 detalhe: texto("detalhe"),
                 aviso: texto("aviso"),
                 icone_base64: v.get("icone").and_then(Value::as_str).map(String::from),
+                selo: v
+                    .get("selo")
+                    .and_then(Value::as_i64)
+                    .filter(|s| (0..=3).contains(s))
+                    .unwrap_or(0) as i32,
             };
             mapa.insert(PathBuf::from(caminho), ((tamanho, data), info));
         }
@@ -104,6 +112,7 @@ pub fn salvar_cache(biblioteca: &[PathBuf]) {
                 "detalhe": info.detalhe,
                 "aviso": info.aviso,
                 "icone": info.icone_base64,
+                "selo": info.selo,
             }),
         );
     }
@@ -126,6 +135,20 @@ fn do_cache(caminho: &Path, m: Marca) -> Option<Info> {
     match guarda.as_ref()?.get(caminho) {
         Some((marca, info)) if *marca == m => Some(info.clone()),
         _ => None,
+    }
+}
+
+/// Guarda o resultado do Verificar, se o arquivo ainda é o mesmo que foi lido.
+pub fn marcar_selo(caminho: &Path, selo: i32) {
+    let Ok(dados) = std::fs::metadata(caminho) else {
+        return;
+    };
+    let m = marca(&dados);
+    let mut guarda = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((marca, info)) = guarda.as_mut().and_then(|c| c.get_mut(caminho))
+        && *marca == m
+    {
+        info.selo = selo;
     }
 }
 
@@ -185,6 +208,7 @@ pub fn ler(caminho: &Path) -> Info {
         detalhe: String::new(),
         aviso: String::new(),
         icone_base64: None,
+        selo: 0,
     };
     let dados = match std::fs::metadata(caminho) {
         Ok(m) => m,

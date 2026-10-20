@@ -70,6 +70,8 @@ pub struct Pedido {
     pub pasta: Option<PathBuf>,
     /// A ISO que a ação gera, para entrar na biblioteca.
     pub iso_nova: Option<PathBuf>,
+    /// A ISO de origem (para o selo do Verificar).
+    pub iso: Option<PathBuf>,
 }
 
 impl Pedido {
@@ -168,6 +170,7 @@ pub fn montar(acao: Acao, o: &Opcoes) -> Result<Pedido, String> {
         nome: o.nome.clone(),
         pasta: None,
         iso_nova: None,
+        iso: o.iso.clone(),
     };
     match acao {
         Acao::Converter => {
@@ -311,6 +314,22 @@ pub struct Resultado {
     pub detalhe: String,
 }
 
+/// O selo do cartão depois de um Verificar.
+pub fn selo(fim: &Fim) -> Option<i32> {
+    match fim {
+        Fim::Ok {
+            verificado: Some(v),
+            ..
+        } => Some(if situacao_dat(v) == Some("confere") {
+            1
+        } else {
+            2
+        }),
+        Fim::NaoConfere(_) => Some(3),
+        _ => None,
+    }
+}
+
 pub fn resultado(p: &Pedido, fim: &Fim) -> Resultado {
     let r = |estado, titulo: String, detalhe: String| Resultado {
         estado,
@@ -321,7 +340,11 @@ pub fn resultado(p: &Pedido, fim: &Fim) -> Resultado {
         Fim::Cancelado => r(
             CANCELADA,
             format!("Cancelado: {}", p.nome),
-            "O que já tinha sido gravado foi apagado.".into(),
+            if p.acao == Acao::Verificar {
+                "A leitura foi interrompida; nada foi gravado.".into()
+            } else {
+                "O que já tinha sido gravado foi apagado.".into()
+            },
         ),
         Fim::Erro(e) => r(
             FALHOU,
