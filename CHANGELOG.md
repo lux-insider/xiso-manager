@@ -47,6 +47,14 @@ antiga. As versões seguem o [Versionamento Semântico](https://semver.org/lang/
     substituído sem a caixa "Substituir" marcada.
 - Ícone do programa nos executáveis do Windows (menu e janela).
 
+### Depois do lançamento
+Mudanças que entram na própria 4.1.0 (o download da release é atualizado).
+
+- **22/10 — Identidade nova:** o disco com os dados saindo em bits e virando
+  arquivos, nas cores da janela. Logo da barra lateral, ícone da janela, ícone
+  dos `.exe` no Windows e banner do README, todos gerados por
+  `gui/imagens/gerar_logo.py`.
+
 ---
 
 ## 4.0.1 — 2026-10-20
