@@ -1,12 +1,12 @@
 # xiso-manager
 
-![xiso-manager](docs/banner.png)
-
 [![Versão](https://img.shields.io/github/v/release/lux-insider/xiso-manager?label=vers%C3%A3o)](https://github.com/lux-insider/xiso-manager/releases/latest)
 [![Testes](https://github.com/lux-insider/xiso-manager/actions/workflows/testes.yml/badge.svg)](https://github.com/lux-insider/xiso-manager/actions/workflows/testes.yml)
 [![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)](LICENSE)
 ![Plataformas](https://img.shields.io/badge/plataformas-Windows%20%7C%20Linux-informational)
-![Rust](https://img.shields.io/badge/Rust-2024-orange)
+![Rust](https://img.shields.io/badge/feito%20em-Rust-orange)
+
+![xiso-manager](docs/banner.png)
 
 Gerenciador, em português, para imagens ISO de **Xbox** e **Xbox 360**, com
 **janela** e **menu no terminal**. Reúne num lugar só o
@@ -34,6 +34,7 @@ em Rust: não precisa instalar nada.
 - [Problemas comuns](#problemas-comuns)
 - [Testes](#testes)
 - [Documentação](#documentação)
+- [Contribuir](#contribuir)
 - [Licença](#licença)
 
 ---
@@ -374,7 +375,16 @@ python3 -m unittest discover -s tests
 | Documento | Conteúdo |
 |---|---|
 | [CHANGELOG.md](CHANGELOG.md) | histórico de versões |
-| [AUDITORIA.md](AUDITORIA.md) | auditoria de segurança e confiabilidade, com cada achado e sua correção |
+| [AUDITORIA.md](docs/AUDITORIA.md) | auditoria de segurança e confiabilidade, com cada achado e sua correção |
+
+---
+
+## Contribuir
+
+Erros e ideias são bem-vindos nas [issues](https://github.com/lux-insider/xiso-manager/issues/new/choose),
+com um modelo para cada caso. Para enviar código, veja o
+[CONTRIBUTING.md](CONTRIBUTING.md); para falhas de segurança, o
+[SECURITY.md](SECURITY.md).
 
 ---
 
