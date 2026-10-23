@@ -1,4 +1,4 @@
-"""Testes dos achados do AUDITORIA.md: cada um monta o cenário do item e
+"""Testes dos achados do docs/AUDITORIA.md: cada um monta o cenário do item e
 falha na versão 3.2.5.
 
 Rode com:  python3 -m unittest discover -s tests
