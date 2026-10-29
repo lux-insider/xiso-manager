@@ -26,6 +26,18 @@ antiga. As versões seguem o [Versionamento Semântico](https://semver.org/lang/
 
 ## 4.1.0 — 2026-10-20
 
+### Correções depois do lançamento
+As correções entram na própria versão (o download da release é atualizado).
+
+- **29/10 — Emojis e caminhos:** os emojis que alguns terminais desenhavam
+  com 1 coluna (🛠️, ⚙️, ⌨️...) desalinhavam o menu e as caixas; foram
+  trocados por emojis que todo terminal desenha com 2 colunas. Caminhos
+  digitados ou arrastados aceitam aspas e espaços escapados (`\ `), e uma
+  pasta cujo nome termina com espaço é encontrada mesmo sem digitar o
+  espaço. No Criar ISO, um destino que já é pasta recebe o ISO dentro dela,
+  e o nome automático não leva o espaço do fim. Bibliotecas `tokio` e
+  `pulldown-cmark` atualizadas (RUSTSEC-2026-0384 e RUSTSEC-2026-0414).
+
 ### Adicionado
 - **A janela (`xiso-manager-gui`)**, ao lado do menu no terminal, com a
   mesma lógica por baixo:
